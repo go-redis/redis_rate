@@ -33,6 +33,15 @@ func (l *Limiter) Allow(
 
 	allow = l.limiter.Allow()
 
+	rate, err := l.increase(name, dur)
+	if err == nil {
+		allow = rate <= limit
+	}
+
+	return rate, reset, allow
+}
+
+func (l *Limiter) increase(name string, dur time.Duration) (int64, error) {
 	var incr *redis.IntCmd
 	_, err := l.ring.Pipelined(func(pipe *redis.RingPipeline) error {
 		key := redisPrefix + name
@@ -40,12 +49,9 @@ func (l *Limiter) Allow(
 		pipe.Expire(key, dur)
 		return nil
 	})
-	rate, _ = incr.Result()
-	if err == nil {
-		allow = rate <= limit
-	}
 
-	return rate, reset, allow
+	rate, _ := incr.Result()
+	return rate, err
 }
 
 func (l *Limiter) AllowMinute(name string, limit int64) (int64, int64, bool) {
