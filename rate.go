@@ -13,13 +13,13 @@ const redisPrefix = "rate:"
 
 type Limiter struct {
 	limiter *timerate.Limiter
-	ring    *redis.Ring
+	incr    func(string, time.Duration) int64
 }
 
-func NewLimiter(ring *redis.Ring, limiter *timerate.Limiter) *Limiter {
+func NewLimiter(incr func(string, time.Duration) int64, limiter *timerate.Limiter) *Limiter {
 	return &Limiter{
 		limiter: limiter,
-		ring:    ring,
+		incr:    incr,
 	}
 }
 
@@ -33,14 +33,7 @@ func (l *Limiter) Allow(
 
 	allow = l.limiter.Allow()
 
-	var incr *redis.IntCmd
-	_, err := l.ring.Pipelined(func(pipe *redis.RingPipeline) error {
-		key := redisPrefix + name
-		incr = pipe.Incr(key)
-		pipe.Expire(key, dur)
-		return nil
-	})
-	rate, _ = incr.Result()
+	rate = l.incr(name, dur)
 	if err == nil {
 		allow = rate <= limit
 	}
@@ -54,4 +47,20 @@ func (l *Limiter) AllowMinute(name string, limit int64) (int64, int64, bool) {
 
 func (l *Limiter) AllowHour(name string, limit int64) (int64, int64, bool) {
 	return l.Allow(name, limit, time.Hour)
+}
+
+func Increase(name string, dur time.Duration) {
+	ringOptions := &redis.RingOptions{Addrs: map[string]string{"1": "localhost:6379"}}
+	ring := redis.NewRing(ringOptions)
+
+	var incr *redis.IntCmd
+	_, err := ring.Pipelined(func(pipe *redis.RingPipeline) error {
+		key := redisPrefix + name
+		incr = pipe.Incr(key)
+		pipe.Expire(key, dur)
+		return nil
+	})
+	rate, _ = incr.Result()
+
+	return rate
 }
