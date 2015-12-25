@@ -13,8 +13,8 @@ import (
 )
 
 func handler(w http.ResponseWriter, req *http.Request, rateLimiter *rate.Limiter) {
-	limit := int64(5)
 	userID := "user-12345"
+	limit := int64(5)
 
 	rate, reset, allowed := rateLimiter.AllowMinute(userID, limit)
 	if !allowed {
