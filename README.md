@@ -1,4 +1,4 @@
-# Rate limiting for go-redis [![Build Status](https://travis-ci.org/go-redis/rate.svg)](https://travis-ci.org/go-redis/rate)
+# Rate limiting for go-redis [![Build Status](https://travis-ci.org/go-redis/rate.svg?branch=v4)](https://travis-ci.org/go-redis/rate)
 
 ```go
 package rate_test
@@ -11,8 +11,8 @@ import (
 
 	timerate "golang.org/x/time/rate"
 
-	"gopkg.in/go-redis/rate.v1"
-	"gopkg.in/redis.v3"
+	"gopkg.in/go-redis/rate.v4"
+	"gopkg.in/redis.v4"
 )
 
 func handler(w http.ResponseWriter, req *http.Request, rateLimiter *rate.Limiter) {
@@ -33,20 +33,19 @@ func handler(w http.ResponseWriter, req *http.Request, rateLimiter *rate.Limiter
 }
 
 func Example_rateLimit() {
-	ringOptions := &redis.RingOptions{Addrs: map[string]string{"1": "localhost:6379"}}
-	ring := redis.NewRing(ringOptions)
-	rateLimiter := NewRateLimiter(ring)
+	ring := redis.NewRing(&redis.RingOptions{
+		Addrs: map[string]string{
+			"server1": "localhost:6379",
+		},
+	})
+	fallbackLimiter := timerate.NewLimiter(timerate.Every(time.Second), 100)
+	limiter := rate.NewLimiter(ring, fallbackLimiter)
 
 	http.HandleFunc("/", func(w http.ResponseWriter, req *http.Request) {
-		handler(w, req, rateLimiter)
+		handler(w, req, limiter)
 	})
 
 	http.HandleFunc("/favicon.ico", http.NotFound)
 	http.ListenAndServe(":8080", nil)
-}
-
-func NewRateLimiter(ring *redis.Ring) *rate.Limiter {
-	limiter := timerate.NewLimiter(timerate.Every(time.Second/100), 10)
-	return rate.NewLimiter(ring, limiter)
 }
 ```

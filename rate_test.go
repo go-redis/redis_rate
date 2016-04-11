@@ -5,18 +5,20 @@ import (
 	"time"
 
 	timerate "golang.org/x/time/rate"
-	"gopkg.in/redis.v3"
+	"gopkg.in/redis.v4"
 
-	"github.com/go-redis/rate"
+	"gopkg.in/go-redis/rate.v4"
 )
 
 func rateLimiter() *rate.Limiter {
 	ring := redis.NewRing(&redis.RingOptions{
-		Addrs: map[string]string{"0": ":6379"},
+		Addrs: map[string]string{"server0": ":6379"},
 	})
-	ring.FlushDb()
-	limiter := timerate.NewLimiter(timerate.Every(time.Millisecond), 100)
-	return rate.NewLimiter(ring, limiter)
+	if err := ring.FlushDb().Err(); err != nil {
+		panic(err)
+	}
+	fallbackLimiter := timerate.NewLimiter(timerate.Every(time.Millisecond), 100)
+	return rate.NewLimiter(ring, fallbackLimiter)
 }
 
 func TestLimit(t *testing.T) {

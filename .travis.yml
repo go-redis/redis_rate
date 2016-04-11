@@ -5,10 +5,16 @@ services:
   - redis-server
 
 go:
-  - 1.4
   - 1.5
+  - 1.6
   - tip
 
 matrix:
   allow_failures:
     - go: tip
+
+install:
+  - go get gopkg.in/redis.v4
+  - go get golang.org/x/time/rate
+  - mkdir -p $HOME/gopath/src/gopkg.in/go-redis/
+  - mv `pwd` $HOME/gopath/src/gopkg.in/go-redis/rate.v4
