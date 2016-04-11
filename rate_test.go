@@ -5,21 +5,23 @@ import (
 	"time"
 
 	timerate "golang.org/x/time/rate"
-	"gopkg.in/redis.v3"
+	"gopkg.in/redis.v4"
 
-	"github.com/go-redis/rate"
+	"gopkg.in/go-redis/rate.v4"
 )
 
 func rateLimiter() *rate.Limiter {
 	ring := redis.NewRing(&redis.RingOptions{
-		Addrs: map[string]string{"0": ":6379"},
+		Addrs: map[string]string{"server0": ":6379"},
 	})
-	ring.FlushDb()
-	limiter := timerate.NewLimiter(timerate.Every(time.Millisecond), 100)
-	return rate.NewLimiter(ring, limiter)
+	if err := ring.FlushDb().Err(); err != nil {
+		panic(err)
+	}
+	fallbackLimiter := timerate.NewLimiter(timerate.Every(time.Millisecond), 100)
+	return rate.NewLimiter(ring, fallbackLimiter)
 }
 
-func TestLimit(t *testing.T) {
+func TestAllow(t *testing.T) {
 	l := rateLimiter()
 
 	rate, reset, allow := l.Allow("test_id", 1, time.Minute)
@@ -40,6 +42,23 @@ func TestLimit(t *testing.T) {
 	}
 	if rate != 2 {
 		t.Fatalf("got %d, wanted 2", rate)
+	}
+}
+
+func TestAllowRate(t *testing.T) {
+	l := rateLimiter()
+
+	_, allow := l.AllowRate("rate", 2*timerate.Every(time.Minute))
+	if !allow {
+		t.Fatal("rate limited")
+	}
+
+	delay, allow := l.AllowRate("rate", 2*timerate.Every(time.Minute))
+	if allow {
+		t.Fatal("not rate limited")
+	}
+	if !(delay > 0 && delay < 30*time.Second) {
+		t.Fatalf("got %s, wanted 0 < dur < 30s", delay)
 	}
 }
 
