@@ -45,20 +45,45 @@ func TestAllow(t *testing.T) {
 	}
 }
 
-func TestAllowRate(t *testing.T) {
+func TestAllowRateMinute(t *testing.T) {
+	const n = 2
+	const dur = time.Minute
+
 	l := rateLimiter()
 
-	_, allow := l.AllowRate("rate", 2*timerate.Every(time.Minute))
+	_, allow := l.AllowRate("rate", n*timerate.Every(dur))
 	if !allow {
 		t.Fatal("rate limited")
 	}
 
-	delay, allow := l.AllowRate("rate", 2*timerate.Every(time.Minute))
+	delay, allow := l.AllowRate("rate", n*timerate.Every(dur))
 	if allow {
 		t.Fatal("not rate limited")
 	}
-	if !(delay > 0 && delay < 30*time.Second) {
-		t.Fatalf("got %s, wanted 0 < dur < 30s", delay)
+	if !durEqual(delay, dur/n) {
+		t.Fatalf("got %s, wanted 0 < dur < %s", delay, dur/n)
+	}
+}
+
+func TestAllowRateSecond(t *testing.T) {
+	const n = 10
+	const dur = time.Second
+
+	l := rateLimiter()
+
+	for i := 0; i < n; i++ {
+		_, allow := l.AllowRate("rate", n*timerate.Every(dur))
+		if !allow {
+			t.Fatal("rate limited")
+		}
+	}
+
+	delay, allow := l.AllowRate("rate", n*timerate.Every(dur))
+	if allow {
+		t.Fatal("not rate limited")
+	}
+	if !durEqual(delay, time.Second) {
+		t.Fatalf("got %s, wanted 0 < dur < %s", delay, dur)
 	}
 }
 
@@ -82,4 +107,8 @@ func TestRedisIsDown(t *testing.T) {
 	if rate != 0 {
 		t.Fatalf("got %d, wanted 0", rate)
 	}
+}
+
+func durEqual(got, wanted time.Duration) bool {
+	return got > 0 && got < wanted
 }
