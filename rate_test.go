@@ -1,16 +1,15 @@
-package rate_test
+package rate
 
 import (
 	"testing"
 	"time"
 
-	timerate "golang.org/x/time/rate"
-	"gopkg.in/redis.v4"
+	redis "gopkg.in/redis.v4"
 
-	"gopkg.in/go-redis/rate.v4"
+	timerate "golang.org/x/time/rate"
 )
 
-func rateLimiter() *rate.Limiter {
+func rateLimiter() *Limiter {
 	ring := redis.NewRing(&redis.RingOptions{
 		Addrs: map[string]string{"server0": ":6379"},
 	})
@@ -18,7 +17,7 @@ func rateLimiter() *rate.Limiter {
 		panic(err)
 	}
 	fallbackLimiter := timerate.NewLimiter(timerate.Every(time.Millisecond), 100)
-	return rate.NewLimiter(ring, fallbackLimiter)
+	return NewLimiter(ring, fallbackLimiter)
 }
 
 func TestAllow(t *testing.T) {
@@ -90,7 +89,7 @@ func TestAllowRateSecond(t *testing.T) {
 func TestRedisIsDown(t *testing.T) {
 	ring := redis.NewRing(&redis.RingOptions{})
 	limiter := timerate.NewLimiter(timerate.Every(time.Second), 1)
-	l := rate.NewLimiter(ring, limiter)
+	l := NewLimiter(ring, limiter)
 
 	rate, _, allow := l.AllowMinute("test_id", 1)
 	if !allow {
@@ -109,6 +108,98 @@ func TestRedisIsDown(t *testing.T) {
 	}
 }
 
+func TestVerify(t *testing.T) {
+	l := rateLimiter()
+
+	rate, reset, allow := l.Verify("test_id", 1, time.Minute)
+	if !allow {
+		t.Fatalf("rate limited with rate %d", rate)
+	}
+	if rate != 0 {
+		t.Fatalf("got %d, wanted 1", rate)
+	}
+	dur := time.Duration(reset-time.Now().Unix()) * time.Second
+	if dur > time.Minute {
+		t.Fatalf("got %s, wanted <= %s", dur, time.Minute)
+	}
+
+	l.Allow("test_id", 1, time.Minute)
+	l.Allow("test_id", 1, time.Minute)
+
+	rate, reset, allow = l.Verify("test_id", 1, time.Minute)
+	if allow {
+		t.Fatalf("should rate limit with rate %d", rate)
+	}
+	if rate != 2 {
+		t.Fatalf("got %d, wanted 1", rate)
+	}
+	dur = time.Duration(reset-time.Now().Unix()) * time.Second
+	if dur > time.Minute {
+		t.Fatalf("got %s, wanted <= %s", dur, time.Minute)
+	}
+}
+
+func TestVerifyMinute(t *testing.T) {
+	l := rateLimiter()
+
+	rate, reset, allow := l.VerifyMinute("test_id", 1)
+	if !allow {
+		t.Fatalf("rate limited with rate %d", rate)
+	}
+	if rate != 0 {
+		t.Fatalf("got %d, wanted 1", rate)
+	}
+	dur := time.Duration(reset-time.Now().Unix()) * time.Second
+	if dur > time.Minute {
+		t.Fatalf("got %s, wanted <= %s", dur, time.Minute)
+	}
+
+	l.AllowMinute("test_id", 1)
+	l.AllowMinute("test_id", 1)
+
+	rate, reset, allow = l.VerifyMinute("test_id", 1)
+	if allow {
+		t.Fatalf("should rate limit with rate %d", rate)
+	}
+	if rate != 2 {
+		t.Fatalf("got %d, wanted 1", rate)
+	}
+	dur = time.Duration(reset-time.Now().Unix()) * time.Second
+	if dur > time.Minute {
+		t.Fatalf("got %s, wanted <= %s", dur, time.Minute)
+	}
+}
+
+func TestVerifyHour(t *testing.T) {
+	l := rateLimiter()
+
+	rate, reset, allow := l.VerifyHour("test_id", 1)
+	if !allow {
+		t.Fatalf("rate limited with rate %d", rate)
+	}
+	if rate != 0 {
+		t.Fatalf("got %d, wanted 1", rate)
+	}
+	dur := time.Duration(reset-time.Now().Unix()) * time.Second
+	if dur > time.Hour {
+		t.Fatalf("got %s, wanted <= %s", dur, time.Hour)
+	}
+
+	l.AllowHour("test_id", 1)
+	l.AllowHour("test_id", 1)
+
+	rate, reset, allow = l.VerifyHour("test_id", 1)
+	if allow {
+		t.Fatalf("should rate limit with rate %d", rate)
+	}
+	if rate != 2 {
+		t.Fatalf("got %d, wanted 1", rate)
+	}
+	dur = time.Duration(reset-time.Now().Unix()) * time.Second
+	if dur > time.Hour {
+		t.Fatalf("got %s, wanted <= %s", dur, time.Hour)
+	}
+}
 func durEqual(got, wanted time.Duration) bool {
 	return got > 0 && got < wanted
 }

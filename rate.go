@@ -1,12 +1,13 @@
-package rate // import "gopkg.in/go-redis/rate.v4"
+package rate
 
 import (
 	"fmt"
+	"strconv"
 	"time"
 
-	timerate "golang.org/x/time/rate"
+	redis "gopkg.in/redis.v4"
 
-	"gopkg.in/redis.v4"
+	timerate "golang.org/x/time/rate"
 )
 
 const redisPrefix = "rate"
@@ -91,6 +92,34 @@ func (l *Limiter) AllowRate(name string, rateLimit timerate.Limit) (delay time.D
 	return delay, allow
 }
 
+// Verify reports whether an event with given name may happen at time now.
+// It allows up to maxn events within duration dur.
+// The difference for the Allow method is that this method does not increment usage.
+func (l *Limiter) Verify(name string, maxn int64, dur time.Duration) (count, reset int64, allow bool) {
+	udur := int64(dur / time.Second)
+	slot := time.Now().Unix() / udur
+	reset = (slot + 1) * udur
+	allow = l.fallbackLimiter.Allow()
+
+	name = fmt.Sprintf("%s:%s-%d", redisPrefix, name, slot)
+	count, err := l.get(name, dur)
+	if err == nil {
+		allow = count <= maxn
+	}
+
+	return count, reset, allow
+}
+
+// VerifyMinute is shorthand for Verify(name, maxn, time.Minute).
+func (l *Limiter) VerifyMinute(name string, maxn int64) (int64, int64, bool) {
+	return l.Verify(name, maxn, time.Minute)
+}
+
+// VerifyHour is shorthand for Verify(name, maxn, time.Hour).
+func (l *Limiter) VerifyHour(name string, maxn int64) (int64, int64, bool) {
+	return l.Verify(name, maxn, time.Hour)
+}
+
 func (l *Limiter) incr(name string, dur time.Duration) (int64, error) {
 	var incr *redis.IntCmd
 	_, err := l.redis.Pipelined(func(pipe *redis.Pipeline) error {
@@ -100,5 +129,24 @@ func (l *Limiter) incr(name string, dur time.Duration) (int64, error) {
 	})
 
 	rate, _ := incr.Result()
+	return rate, err
+}
+
+func (l *Limiter) get(name string, dur time.Duration) (int64, error) {
+	var getCmd *redis.StringCmd
+	_, err := l.redis.Pipelined(func(pipe *redis.Pipeline) error {
+		getCmd = pipe.Get(name)
+		return nil
+	})
+
+	rate := int64(0)
+	rateStr, _ := getCmd.Result()
+	if rateStr != "" {
+		rateInt, err := strconv.ParseInt(rateStr, 10, 64)
+		if err != nil {
+			return 0, err
+		}
+		rate = int64(rateInt)
+	}
 	return rate, err
 }
