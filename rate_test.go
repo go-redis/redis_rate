@@ -111,7 +111,7 @@ func TestRedisIsDown(t *testing.T) {
 func TestVerify(t *testing.T) {
 	l := rateLimiter()
 
-	rate, reset, allow := l.Verify("test_id", 1, time.Minute)
+	rate, reset, allow := l.Verify("test_verify_id", 1, time.Minute)
 	if !allow {
 		t.Fatalf("rate limited with rate %d", rate)
 	}
@@ -123,10 +123,10 @@ func TestVerify(t *testing.T) {
 		t.Fatalf("got %s, wanted <= %s", dur, time.Minute)
 	}
 
-	l.Allow("test_id", 1, time.Minute)
-	l.Allow("test_id", 1, time.Minute)
+	l.Allow("test_verify_id", 1, time.Minute)
+	l.Allow("test_verify_id", 1, time.Minute)
 
-	rate, reset, allow = l.Verify("test_id", 1, time.Minute)
+	rate, reset, allow = l.Verify("test_verify_id", 1, time.Minute)
 	if allow {
 		t.Fatalf("should rate limit with rate %d", rate)
 	}
@@ -142,7 +142,7 @@ func TestVerify(t *testing.T) {
 func TestVerifyMinute(t *testing.T) {
 	l := rateLimiter()
 
-	rate, reset, allow := l.VerifyMinute("test_id", 1)
+	rate, reset, allow := l.VerifyMinute("test_verify_minute_id", 1)
 	if !allow {
 		t.Fatalf("rate limited with rate %d", rate)
 	}
@@ -154,10 +154,10 @@ func TestVerifyMinute(t *testing.T) {
 		t.Fatalf("got %s, wanted <= %s", dur, time.Minute)
 	}
 
-	l.AllowMinute("test_id", 1)
-	l.AllowMinute("test_id", 1)
+	l.AllowMinute("test_verify_minute_id", 1)
+	l.AllowMinute("test_verify_minute_id", 1)
 
-	rate, reset, allow = l.VerifyMinute("test_id", 1)
+	rate, reset, allow = l.VerifyMinute("test_verify_minute_id", 1)
 	if allow {
 		t.Fatalf("should rate limit with rate %d", rate)
 	}
@@ -173,7 +173,7 @@ func TestVerifyMinute(t *testing.T) {
 func TestVerifyHour(t *testing.T) {
 	l := rateLimiter()
 
-	rate, reset, allow := l.VerifyHour("test_id", 1)
+	rate, reset, allow := l.VerifyHour("test_verify_hour_id", 1)
 	if !allow {
 		t.Fatalf("rate limited with rate %d", rate)
 	}
@@ -185,10 +185,10 @@ func TestVerifyHour(t *testing.T) {
 		t.Fatalf("got %s, wanted <= %s", dur, time.Hour)
 	}
 
-	l.AllowHour("test_id", 1)
-	l.AllowHour("test_id", 1)
+	l.AllowHour("test_verify_hour_id", 1)
+	l.AllowHour("test_verify_hour_id", 1)
 
-	rate, reset, allow = l.VerifyHour("test_id", 1)
+	rate, reset, allow = l.VerifyHour("test_verify_hour_id", 1)
 	if allow {
 		t.Fatalf("should rate limit with rate %d", rate)
 	}
