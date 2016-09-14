@@ -102,7 +102,7 @@ func (l *Limiter) Verify(name string, maxn int64, dur time.Duration) (count, res
 	allow = l.fallbackLimiter.Allow()
 
 	name = fmt.Sprintf("%s:%s-%d", redisPrefix, name, slot)
-	count, err := l.get(name, dur)
+	count, err := l.get(name)
 	if err == nil {
 		allow = count <= maxn
 	}
@@ -132,7 +132,7 @@ func (l *Limiter) incr(name string, dur time.Duration) (int64, error) {
 	return rate, err
 }
 
-func (l *Limiter) get(name string, dur time.Duration) (int64, error) {
+func (l *Limiter) get(name string) (int64, error) {
 	var getCmd *redis.StringCmd
 	_, err := l.redis.Pipelined(func(pipe *redis.Pipeline) error {
 		getCmd = pipe.Get(name)
