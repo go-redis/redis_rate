@@ -108,14 +108,14 @@ func TestRedisIsDown(t *testing.T) {
 	}
 }
 
-func TestVerify(t *testing.T) {
+func TestAllowN(t *testing.T) {
 	l := rateLimiter()
 
-	rate, reset, allow := l.Verify("test_verify_id", 1, time.Minute)
+	rate, reset, allow := l.AllowN("test_allow_n", 1, time.Minute, 1)
 	if !allow {
 		t.Fatalf("rate limited with rate %d", rate)
 	}
-	if rate != 0 {
+	if rate != 1 {
 		t.Fatalf("got %d, wanted 1", rate)
 	}
 	dur := time.Duration(reset-time.Now().Unix()) * time.Second
@@ -123,15 +123,14 @@ func TestVerify(t *testing.T) {
 		t.Fatalf("got %s, wanted <= %s", dur, time.Minute)
 	}
 
-	l.Allow("test_verify_id", 1, time.Minute)
-	l.Allow("test_verify_id", 1, time.Minute)
+	l.AllowN("test_allow_n", 1, time.Minute, 2)
 
-	rate, reset, allow = l.Verify("test_verify_id", 1, time.Minute)
+	rate, reset, allow = l.AllowN("test_allow_n", 1, time.Minute, 0)
 	if allow {
 		t.Fatalf("should rate limit with rate %d", rate)
 	}
-	if rate != 2 {
-		t.Fatalf("got %d, wanted 1", rate)
+	if rate != 3 {
+		t.Fatalf("got %d, wanted 3", rate)
 	}
 	dur = time.Duration(reset-time.Now().Unix()) * time.Second
 	if dur > time.Minute {
@@ -139,67 +138,6 @@ func TestVerify(t *testing.T) {
 	}
 }
 
-func TestVerifyMinute(t *testing.T) {
-	l := rateLimiter()
-
-	rate, reset, allow := l.VerifyMinute("test_verify_minute_id", 1)
-	if !allow {
-		t.Fatalf("rate limited with rate %d", rate)
-	}
-	if rate != 0 {
-		t.Fatalf("got %d, wanted 1", rate)
-	}
-	dur := time.Duration(reset-time.Now().Unix()) * time.Second
-	if dur > time.Minute {
-		t.Fatalf("got %s, wanted <= %s", dur, time.Minute)
-	}
-
-	l.AllowMinute("test_verify_minute_id", 1)
-	l.AllowMinute("test_verify_minute_id", 1)
-
-	rate, reset, allow = l.VerifyMinute("test_verify_minute_id", 1)
-	if allow {
-		t.Fatalf("should rate limit with rate %d", rate)
-	}
-	if rate != 2 {
-		t.Fatalf("got %d, wanted 1", rate)
-	}
-	dur = time.Duration(reset-time.Now().Unix()) * time.Second
-	if dur > time.Minute {
-		t.Fatalf("got %s, wanted <= %s", dur, time.Minute)
-	}
-}
-
-func TestVerifyHour(t *testing.T) {
-	l := rateLimiter()
-
-	rate, reset, allow := l.VerifyHour("test_verify_hour_id", 1)
-	if !allow {
-		t.Fatalf("rate limited with rate %d", rate)
-	}
-	if rate != 0 {
-		t.Fatalf("got %d, wanted 1", rate)
-	}
-	dur := time.Duration(reset-time.Now().Unix()) * time.Second
-	if dur > time.Hour {
-		t.Fatalf("got %s, wanted <= %s", dur, time.Hour)
-	}
-
-	l.AllowHour("test_verify_hour_id", 1)
-	l.AllowHour("test_verify_hour_id", 1)
-
-	rate, reset, allow = l.VerifyHour("test_verify_hour_id", 1)
-	if allow {
-		t.Fatalf("should rate limit with rate %d", rate)
-	}
-	if rate != 2 {
-		t.Fatalf("got %d, wanted 1", rate)
-	}
-	dur = time.Duration(reset-time.Now().Unix()) * time.Second
-	if dur > time.Hour {
-		t.Fatalf("got %s, wanted <= %s", dur, time.Hour)
-	}
-}
 func durEqual(got, wanted time.Duration) bool {
 	return got > 0 && got < wanted
 }

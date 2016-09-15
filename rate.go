@@ -2,7 +2,6 @@ package rate
 
 import (
 	"fmt"
-	"strconv"
 	"time"
 
 	redis "gopkg.in/redis.v4"
@@ -16,14 +15,15 @@ type rediser interface {
 	Pipelined(func(pipe *redis.Pipeline) error) ([]redis.Cmder, error)
 }
 
+//Limiter type
 type Limiter struct {
 	fallbackLimiter *timerate.Limiter
 	redis           rediser
 }
 
-// A Limiter controls how frequently events are allowed to happen. It uses
-// the redis to store data and fallbacks to the fallbackLimiter
-// when Redis Server is not available.
+// NewLimiter creates a limiter that controls how frequently events
+// are allowed to happen. It uses redis to store data and fallbacks
+// to the fallbackLimiter when Redis Server is not available.
 func NewLimiter(redis rediser, fallbackLimiter *timerate.Limiter) *Limiter {
 	return &Limiter{
 		fallbackLimiter: fallbackLimiter,
@@ -31,21 +31,28 @@ func NewLimiter(redis rediser, fallbackLimiter *timerate.Limiter) *Limiter {
 	}
 }
 
-// Allow reports whether an event with given name may happen at time now.
-// It allows up to maxn events within duration dur.
-func (l *Limiter) Allow(name string, maxn int64, dur time.Duration) (count, reset int64, allow bool) {
+// AllowN reports whether an event with given name may happen at time now.
+// It allows up to maxn events within duration dur, with each interaction incrementing
+// the limit by n.
+func (l *Limiter) AllowN(name string, maxn int64, dur time.Duration, n int64) (count, reset int64, allow bool) {
 	udur := int64(dur / time.Second)
 	slot := time.Now().Unix() / udur
 	reset = (slot + 1) * udur
 	allow = l.fallbackLimiter.Allow()
 
 	name = fmt.Sprintf("%s:%s-%d", redisPrefix, name, slot)
-	count, err := l.incr(name, dur)
+	count, err := l.incr(name, dur, n)
 	if err == nil {
 		allow = count <= maxn
 	}
 
 	return count, reset, allow
+}
+
+// Allow reports whether an event with given name may happen at time now.
+// It allows up to maxn events within duration dur.
+func (l *Limiter) Allow(name string, maxn int64, dur time.Duration) (count, reset int64, allow bool) {
+	return l.AllowN(name, maxn, dur, 1)
 }
 
 // AllowMinute is shorthand for Allow(name, maxn, time.Minute).
@@ -80,7 +87,7 @@ func (l *Limiter) AllowRate(name string, rateLimit timerate.Limit) (delay time.D
 	allow = l.fallbackLimiter.Allow()
 
 	name = fmt.Sprintf("%s:%s-%d-%d", redisPrefix, name, dur, slot)
-	count, err := l.incr(name, dur)
+	count, err := l.incr(name, dur, 1)
 	if err == nil {
 		allow = count <= limit
 	}
@@ -92,61 +99,14 @@ func (l *Limiter) AllowRate(name string, rateLimit timerate.Limit) (delay time.D
 	return delay, allow
 }
 
-// Verify reports whether an event with given name may happen at time now.
-// It allows up to maxn events within duration dur.
-// The difference for the Allow method is that this method does not increment usage.
-func (l *Limiter) Verify(name string, maxn int64, dur time.Duration) (count, reset int64, allow bool) {
-	udur := int64(dur / time.Second)
-	slot := time.Now().Unix() / udur
-	reset = (slot + 1) * udur
-	allow = l.fallbackLimiter.Allow()
-
-	name = fmt.Sprintf("%s:%s-%d", redisPrefix, name, slot)
-	count, err := l.get(name)
-	if err == nil {
-		allow = count <= maxn
-	}
-
-	return count, reset, allow
-}
-
-// VerifyMinute is shorthand for Verify(name, maxn, time.Minute).
-func (l *Limiter) VerifyMinute(name string, maxn int64) (int64, int64, bool) {
-	return l.Verify(name, maxn, time.Minute)
-}
-
-// VerifyHour is shorthand for Verify(name, maxn, time.Hour).
-func (l *Limiter) VerifyHour(name string, maxn int64) (int64, int64, bool) {
-	return l.Verify(name, maxn, time.Hour)
-}
-
-func (l *Limiter) incr(name string, dur time.Duration) (int64, error) {
+func (l *Limiter) incr(name string, dur time.Duration, n int64) (int64, error) {
 	var incr *redis.IntCmd
 	_, err := l.redis.Pipelined(func(pipe *redis.Pipeline) error {
-		incr = pipe.Incr(name)
+		incr = pipe.IncrBy(name, n)
 		pipe.Expire(name, dur)
 		return nil
 	})
 
 	rate, _ := incr.Result()
-	return rate, err
-}
-
-func (l *Limiter) get(name string) (int64, error) {
-	var getCmd *redis.StringCmd
-	_, err := l.redis.Pipelined(func(pipe *redis.Pipeline) error {
-		getCmd = pipe.Get(name)
-		return nil
-	})
-
-	rate := int64(0)
-	rateStr, _ := getCmd.Result()
-	if rateStr != "" {
-		rateInt, err := strconv.ParseInt(rateStr, 10, 64)
-		if err != nil {
-			return 0, err
-		}
-		rate = int64(rateInt)
-	}
 	return rate, err
 }
