@@ -1,16 +1,15 @@
-package rate_test
+package rate
 
 import (
 	"testing"
 	"time"
 
-	timerate "golang.org/x/time/rate"
-	"gopkg.in/redis.v4"
+	redis "gopkg.in/redis.v4"
 
-	"gopkg.in/go-redis/rate.v4"
+	timerate "golang.org/x/time/rate"
 )
 
-func rateLimiter() *rate.Limiter {
+func rateLimiter() *Limiter {
 	ring := redis.NewRing(&redis.RingOptions{
 		Addrs: map[string]string{"server0": ":6379"},
 	})
@@ -18,7 +17,7 @@ func rateLimiter() *rate.Limiter {
 		panic(err)
 	}
 	fallbackLimiter := timerate.NewLimiter(timerate.Every(time.Millisecond), 100)
-	return rate.NewLimiter(ring, fallbackLimiter)
+	return NewLimiter(ring, fallbackLimiter)
 }
 
 func TestAllow(t *testing.T) {
@@ -90,7 +89,7 @@ func TestAllowRateSecond(t *testing.T) {
 func TestRedisIsDown(t *testing.T) {
 	ring := redis.NewRing(&redis.RingOptions{})
 	limiter := timerate.NewLimiter(timerate.Every(time.Second), 1)
-	l := rate.NewLimiter(ring, limiter)
+	l := NewLimiter(ring, limiter)
 
 	rate, _, allow := l.AllowMinute("test_id", 1)
 	if !allow {
@@ -106,6 +105,36 @@ func TestRedisIsDown(t *testing.T) {
 	}
 	if rate != 0 {
 		t.Fatalf("got %d, wanted 0", rate)
+	}
+}
+
+func TestAllowN(t *testing.T) {
+	l := rateLimiter()
+
+	rate, reset, allow := l.AllowN("test_allow_n", 1, time.Minute, 1)
+	if !allow {
+		t.Fatalf("rate limited with rate %d", rate)
+	}
+	if rate != 1 {
+		t.Fatalf("got %d, wanted 1", rate)
+	}
+	dur := time.Duration(reset-time.Now().Unix()) * time.Second
+	if dur > time.Minute {
+		t.Fatalf("got %s, wanted <= %s", dur, time.Minute)
+	}
+
+	l.AllowN("test_allow_n", 1, time.Minute, 2)
+
+	rate, reset, allow = l.AllowN("test_allow_n", 1, time.Minute, 0)
+	if allow {
+		t.Fatalf("should rate limit with rate %d", rate)
+	}
+	if rate != 3 {
+		t.Fatalf("got %d, wanted 3", rate)
+	}
+	dur = time.Duration(reset-time.Now().Unix()) * time.Second
+	if dur > time.Minute {
+		t.Fatalf("got %s, wanted <= %s", dur, time.Minute)
 	}
 }
 

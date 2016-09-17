@@ -35,6 +35,17 @@ func handler(w http.ResponseWriter, req *http.Request, rateLimiter *rate.Limiter
 	fmt.Fprint(w, "Rate limit remaining: ", strconv.FormatInt(limit-rate, 10))
 }
 
+func statusHandler(w http.ResponseWriter, req *http.Request, rateLimiter *rate.Limiter) {
+	userID := "user-12345"
+	limit := int64(5)
+
+	//With increment 0, we just retrieve the current limit
+	rate, reset, allowed := rateLimiter.AllowN(userID, limit, time.Minute, 0)
+	fmt.Fprintf(w, "Current rate: %d", rate)
+	fmt.Fprintf(w, "Reset: %d", reset)
+	fmt.Fprintf(w, "Allowed: %v", allowed)
+}
+
 func main() {
 	ring := redis.NewRing(&redis.RingOptions{
 		Addrs: map[string]string{
@@ -46,6 +57,10 @@ func main() {
 
 	http.HandleFunc("/", func(w http.ResponseWriter, req *http.Request) {
 		handler(w, req, limiter)
+	})
+
+	http.HandleFunc("/status", func(w http.ResponseWriter, req *http.Request) {
+		statusHandler(w, req, limiter)
 	})
 
 	http.HandleFunc("/favicon.ico", http.NotFound)
