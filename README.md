@@ -39,7 +39,7 @@ func statusHandler(w http.ResponseWriter, req *http.Request, rateLimiter *rate.L
 	userID := "user-12345"
 	limit := int64(5)
 
-	//With increment 0, we just retrieve the current limit
+	// With n=0 we just retrieve the current limit.
 	rate, reset, allowed := rateLimiter.AllowN(userID, limit, time.Minute, 0)
 	fmt.Fprintf(w, "Current rate: %d", rate)
 	fmt.Fprintf(w, "Reset: %d", reset)

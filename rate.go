@@ -1,4 +1,4 @@
-package rate
+package rate // import "gopkg.in/go-redis/rate.v4"
 
 import (
 	"fmt"
@@ -15,15 +15,14 @@ type rediser interface {
 	Pipelined(func(pipe *redis.Pipeline) error) ([]redis.Cmder, error)
 }
 
-//Limiter type
+// Limiter controls how frequently events are allowed to happen.
+// It uses redis to store data and fallbacks to the fallbackLimiter
+// when Redis Server is not available.
 type Limiter struct {
 	fallbackLimiter *timerate.Limiter
 	redis           rediser
 }
 
-// NewLimiter creates a limiter that controls how frequently events
-// are allowed to happen. It uses redis to store data and fallbacks
-// to the fallbackLimiter when Redis Server is not available.
 func NewLimiter(redis rediser, fallbackLimiter *timerate.Limiter) *Limiter {
 	return &Limiter{
 		fallbackLimiter: fallbackLimiter,
@@ -32,8 +31,8 @@ func NewLimiter(redis rediser, fallbackLimiter *timerate.Limiter) *Limiter {
 }
 
 // AllowN reports whether an event with given name may happen at time now.
-// It allows up to maxn events within duration dur, with each interaction incrementing
-// the limit by n.
+// It allows up to maxn events within duration dur, with each interaction
+// incrementing the limit by n.
 func (l *Limiter) AllowN(name string, maxn int64, dur time.Duration, n int64) (count, reset int64, allow bool) {
 	udur := int64(dur / time.Second)
 	slot := time.Now().Unix() / udur
@@ -49,8 +48,7 @@ func (l *Limiter) AllowN(name string, maxn int64, dur time.Duration, n int64) (c
 	return count, reset, allow
 }
 
-// Allow reports whether an event with given name may happen at time now.
-// It allows up to maxn events within duration dur.
+// Allow is shorthand for AllowN(name, max, dur, 1).
 func (l *Limiter) Allow(name string, maxn int64, dur time.Duration) (count, reset int64, allow bool) {
 	return l.AllowN(name, maxn, dur, 1)
 }
