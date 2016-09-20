@@ -28,17 +28,13 @@ func NewLimiter(redis rediser, fallbackLimiter *timerate.Limiter) *Limiter {
 	}
 }
 
-//Delete deletes everything attached to a key.
-//Will delete all rate limiting attached to any given key.
-func (l *Limiter) Teardown(name string) (err error) {
-	keys, err := l.keys(name)
-	if err != nil {
-		return
-	}
-	
-	for _, k := range keys {
-		err = l.delete(k)
-	}
+//Reset will reset the rate limit for a single key.
+//In the given rate limit window.
+func (l *Limiter) Reset(name string, dur time.Duration) (err error) {
+	udur := int64(dur / time.Second)
+	slot := time.Now().Unix() / udur
+	name = fmt.Sprintf("%s:%s-%d", redisPrefix, name, slot)
+	err = l.delete(name)
 	
 	return
 }
@@ -110,10 +106,10 @@ func (l *Limiter) AllowRate(name string, rateLimit timerate.Limit) (delay time.D
 	return delay, allow
 }
 
-func (l *Limiter) delete(names ...string) (err error) {
+func (l *Limiter) delete(name string) (err error) {
 	var del *redis.IntCmd
 	_, err = l.redis.Pipelined(func(pipe *redis.Pipeline) error {
-		del = pipe.Del(names...)
+		del = pipe.Del(name)
 		return nil
 	})
 	
@@ -124,21 +120,6 @@ func (l *Limiter) delete(names ...string) (err error) {
 	err = del.Err()
 	
 	return
-}
-
-func (l *Limiter) keys(name string) ([]string, error) {
-	var keys *redis.StringSliceCmd
-	_, err := l.redis.Pipelined(func(pipe *redis.Pipeline) error {
-		//hard coded since we know the format
-		keys = pipe.Keys("rate:" + name + "*")
-		return nil
-	})
-	
-	if err != nil {
-		return []string{}, err
-	}
-	
-	return keys.Result()
 }
 
 func (l *Limiter) incr(name string, dur time.Duration, n int64) (int64, error) {
