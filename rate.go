@@ -3,9 +3,7 @@ package rate // import "gopkg.in/go-redis/rate.v4"
 import (
 	"fmt"
 	"time"
-
 	redis "gopkg.in/redis.v4"
-
 	timerate "golang.org/x/time/rate"
 )
 
@@ -30,6 +28,17 @@ func NewLimiter(redis rediser, fallbackLimiter *timerate.Limiter) *Limiter {
 	}
 }
 
+//Reset will reset the rate limit for a single key.
+//In the given rate limit window.
+func (l *Limiter) Reset(name string, dur time.Duration) (err error) {
+	udur := int64(dur / time.Second)
+	slot := time.Now().Unix() / udur
+	name = fmt.Sprintf("%s:%s-%d", redisPrefix, name, slot)
+	err = l.delete(name)
+	
+	return
+}
+
 // AllowN reports whether an event with given name may happen at time now.
 // It allows up to maxn events within duration dur, with each interaction
 // incrementing the limit by n.
@@ -38,13 +47,13 @@ func (l *Limiter) AllowN(name string, maxn int64, dur time.Duration, n int64) (c
 	slot := time.Now().Unix() / udur
 	reset = (slot + 1) * udur
 	allow = l.fallbackLimiter.Allow()
-
+	
 	name = fmt.Sprintf("%s:%s-%d", redisPrefix, name, slot)
 	count, err := l.incr(name, dur, n)
 	if err == nil {
 		allow = count <= maxn
 	}
-
+	
 	return count, reset, allow
 }
 
@@ -72,29 +81,45 @@ func (l *Limiter) AllowRate(name string, rateLimit timerate.Limit) (delay time.D
 	if rateLimit == timerate.Inf {
 		return 0, true
 	}
-
+	
 	dur := time.Second
 	limit := int64(rateLimit)
 	if limit == 0 {
 		limit = 1
 		dur *= time.Duration(1 / rateLimit)
 	}
-
+	
 	now := time.Now()
 	slot := now.UnixNano() / dur.Nanoseconds()
 	allow = l.fallbackLimiter.Allow()
-
+	
 	name = fmt.Sprintf("%s:%s-%d-%d", redisPrefix, name, dur, slot)
 	count, err := l.incr(name, dur, 1)
 	if err == nil {
 		allow = count <= limit
 	}
-
+	
 	if !allow {
 		delay = time.Duration(slot+1)*dur - time.Duration(now.UnixNano())
 	}
-
+	
 	return delay, allow
+}
+
+func (l *Limiter) delete(name string) (err error) {
+	var del *redis.IntCmd
+	_, err = l.redis.Pipelined(func(pipe *redis.Pipeline) error {
+		del = pipe.Del(name)
+		return nil
+	})
+	
+	if err != nil {
+		return
+	}
+	
+	err = del.Err()
+	
+	return
 }
 
 func (l *Limiter) incr(name string, dur time.Duration, n int64) (int64, error) {
@@ -104,7 +129,7 @@ func (l *Limiter) incr(name string, dur time.Duration, n int64) (int64, error) {
 		pipe.Expire(name, dur)
 		return nil
 	})
-
+	
 	rate, _ := incr.Result()
 	return rate, err
 }
