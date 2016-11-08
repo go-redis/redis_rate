@@ -14,7 +14,7 @@ matrix:
     - go: tip
 
 install:
-  - go get gopkg.in/redis.v4
+  - go get gopkg.in/redis.v5
   - go get golang.org/x/time/rate
   - mkdir -p $HOME/gopath/src/gopkg.in/go-redis/
-  - mv `pwd` $HOME/gopath/src/gopkg.in/go-redis/rate.v4
+  - mv `pwd` $HOME/gopath/src/gopkg.in/go-redis/rate.v5

@@ -1,4 +1,4 @@
-# Rate limiting for go-redis [![Build Status](https://travis-ci.org/go-redis/rate.svg?branch=v4)](https://travis-ci.org/go-redis/rate)
+# Rate limiting for go-redis [![Build Status](https://travis-ci.org/go-redis/rate.svg?branch=v5)](https://travis-ci.org/go-redis/rate)
 
 ```go
 // +build example
@@ -14,8 +14,8 @@ import (
 
 	timerate "golang.org/x/time/rate"
 
-	"gopkg.in/go-redis/rate.v4"
-	"gopkg.in/redis.v4"
+	"gopkg.in/go-redis/rate.v5"
+	"gopkg.in/redis.v5"
 )
 
 func handler(w http.ResponseWriter, req *http.Request, rateLimiter *rate.Limiter) {
