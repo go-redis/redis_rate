@@ -5,8 +5,8 @@ services:
   - redis-server
 
 go:
-  - 1.6
   - 1.7
+  - 1.8
   - tip
 
 matrix:
@@ -14,7 +14,5 @@ matrix:
     - go: tip
 
 install:
-  - go get gopkg.in/redis.v5
+  - go get github.com/go-redis/redis
   - go get golang.org/x/time/rate
-  - mkdir -p $HOME/gopath/src/gopkg.in/go-redis/
-  - mv `pwd` $HOME/gopath/src/gopkg.in/go-redis/rate.v5

@@ -4,8 +4,7 @@ import (
 	"testing"
 	"time"
 
-	redis "gopkg.in/redis.v5"
-
+	"github.com/go-redis/redis"
 	timerate "golang.org/x/time/rate"
 )
 

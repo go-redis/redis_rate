@@ -1,11 +1,11 @@
-package rate // import "gopkg.in/go-redis/rate.v5"
+package rate
 
 import (
 	"fmt"
 	"time"
 
+	"github.com/go-redis/redis"
 	timerate "golang.org/x/time/rate"
-	redis "gopkg.in/redis.v5"
 )
 
 const redisPrefix = "rate"
