@@ -1,22 +1,22 @@
-package rate
+package redis_rate_test
 
 import (
 	"testing"
 	"time"
 
 	"github.com/go-redis/redis"
-	timerate "golang.org/x/time/rate"
+	"github.com/go-redis/redis_rate"
+	"golang.org/x/time/rate"
 )
 
-func rateLimiter() *Limiter {
+func rateLimiter() *redis_rate.Limiter {
 	ring := redis.NewRing(&redis.RingOptions{
 		Addrs: map[string]string{"server0": ":6379"},
 	})
 	if err := ring.FlushDb().Err(); err != nil {
 		panic(err)
 	}
-	fallbackLimiter := timerate.NewLimiter(timerate.Every(time.Millisecond), 100)
-	return NewLimiter(ring, fallbackLimiter)
+	return redis_rate.NewLimiter(ring)
 }
 
 func TestAllow(t *testing.T) {
@@ -49,12 +49,12 @@ func TestAllowRateMinute(t *testing.T) {
 
 	l := rateLimiter()
 
-	_, allow := l.AllowRate("rate", n*timerate.Every(dur))
+	_, allow := l.AllowRate("rate", n*rate.Every(dur))
 	if !allow {
 		t.Fatal("rate limited")
 	}
 
-	delay, allow := l.AllowRate("rate", n*timerate.Every(dur))
+	delay, allow := l.AllowRate("rate", n*rate.Every(dur))
 	if allow {
 		t.Fatal("not rate limited")
 	}
@@ -70,13 +70,13 @@ func TestAllowRateSecond(t *testing.T) {
 	l := rateLimiter()
 
 	for i := 0; i < n; i++ {
-		_, allow := l.AllowRate("rate", n*timerate.Every(dur))
+		_, allow := l.AllowRate("rate", n*rate.Every(dur))
 		if !allow {
 			t.Fatal("rate limited")
 		}
 	}
 
-	delay, allow := l.AllowRate("rate", n*timerate.Every(dur))
+	delay, allow := l.AllowRate("rate", n*rate.Every(dur))
 	if allow {
 		t.Fatal("not rate limited")
 	}
@@ -87,8 +87,8 @@ func TestAllowRateSecond(t *testing.T) {
 
 func TestRedisIsDown(t *testing.T) {
 	ring := redis.NewRing(&redis.RingOptions{})
-	limiter := timerate.NewLimiter(timerate.Every(time.Second), 1)
-	l := NewLimiter(ring, limiter)
+	l := redis_rate.NewLimiter(ring)
+	l.Fallback = rate.NewLimiter(rate.Every(time.Second), 1)
 
 	rate, _, allow := l.AllowMinute("test_id", 1)
 	if !allow {

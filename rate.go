@@ -1,11 +1,11 @@
-package rate
+package redis_rate
 
 import (
 	"fmt"
 	"time"
 
 	"github.com/go-redis/redis"
-	timerate "golang.org/x/time/rate"
+	"golang.org/x/time/rate"
 )
 
 const redisPrefix = "rate"
@@ -16,17 +16,16 @@ type rediser interface {
 }
 
 // Limiter controls how frequently events are allowed to happen.
-// It uses redis to store data and fallbacks to the fallbackLimiter
-// when Redis Server is not available.
 type Limiter struct {
-	fallbackLimiter *timerate.Limiter
-	redis           rediser
+	redis rediser
+
+	// Optional fallback limiter used when Redis is unavailable.
+	Fallback *rate.Limiter
 }
 
-func NewLimiter(redis rediser, fallbackLimiter *timerate.Limiter) *Limiter {
+func NewLimiter(redis rediser) *Limiter {
 	return &Limiter{
-		fallbackLimiter: fallbackLimiter,
-		redis:           redis,
+		redis: redis,
 	}
 }
 
@@ -40,11 +39,11 @@ func (l *Limiter) Reset(name string, dur time.Duration) error {
 }
 
 // Reset resets the rate limit for the name and limit.
-func (l *Limiter) ResetRate(name string, rateLimit timerate.Limit) error {
+func (l *Limiter) ResetRate(name string, rateLimit rate.Limit) error {
 	if rateLimit == 0 {
 		return nil
 	}
-	if rateLimit == timerate.Inf {
+	if rateLimit == rate.Inf {
 		return nil
 	}
 
@@ -67,7 +66,10 @@ func (l *Limiter) AllowN(name string, maxn int64, dur time.Duration, n int64) (c
 	udur := int64(dur / time.Second)
 	slot := time.Now().Unix() / udur
 	reset = (slot + 1) * udur
-	allow = l.fallbackLimiter.Allow()
+
+	if l.Fallback != nil {
+		allow = l.Fallback.Allow()
+	}
 
 	name = allowName(name, slot)
 	count, err := l.incr(name, dur, n)
@@ -95,11 +97,11 @@ func (l *Limiter) AllowHour(name string, maxn int64) (int64, int64, bool) {
 
 // AllowRate reports whether an event may happen at time now.
 // It allows up to rateLimit events each second.
-func (l *Limiter) AllowRate(name string, rateLimit timerate.Limit) (delay time.Duration, allow bool) {
+func (l *Limiter) AllowRate(name string, rateLimit rate.Limit) (delay time.Duration, allow bool) {
 	if rateLimit == 0 {
 		return 0, false
 	}
-	if rateLimit == timerate.Inf {
+	if rateLimit == rate.Inf {
 		return 0, true
 	}
 
@@ -112,7 +114,9 @@ func (l *Limiter) AllowRate(name string, rateLimit timerate.Limit) (delay time.D
 	now := time.Now()
 	slot := now.UnixNano() / dur.Nanoseconds()
 
-	allow = l.fallbackLimiter.Allow()
+	if l.Fallback != nil {
+		allow = l.Fallback.Allow()
+	}
 
 	name = allowRateName(name, dur, slot)
 	count, err := l.incr(name, dur, 1)
