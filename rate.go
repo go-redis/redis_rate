@@ -1,4 +1,4 @@
-package rate // import "gopkg.in/go-redis/rate.v5"
+package rate // import "gopkg.in/go-redis/redis_rate.v5"
 
 import (
 	"fmt"
