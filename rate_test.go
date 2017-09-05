@@ -22,16 +22,15 @@ func rateLimiter() *redis_rate.Limiter {
 func TestAllow(t *testing.T) {
 	l := rateLimiter()
 
-	rate, reset, allow := l.Allow("test_id", 1, time.Minute)
+	rate, delay, allow := l.Allow("test_id", 1, time.Minute)
 	if !allow {
 		t.Fatalf("rate limited with rate %d", rate)
 	}
 	if rate != 1 {
 		t.Fatalf("got %d, wanted 1", rate)
 	}
-	dur := time.Duration(reset-time.Now().Unix()) * time.Second
-	if dur > time.Minute {
-		t.Fatalf("got %s, wanted <= %s", dur, time.Minute)
+	if delay > time.Minute {
+		t.Fatalf("got %s, wanted <= %s", delay, time.Minute)
 	}
 
 	rate, _, allow = l.Allow("test_id", 1, time.Minute)
@@ -110,30 +109,28 @@ func TestRedisIsDown(t *testing.T) {
 func TestAllowN(t *testing.T) {
 	l := rateLimiter()
 
-	rate, reset, allow := l.AllowN("test_allow_n", 1, time.Minute, 1)
+	rate, delay, allow := l.AllowN("test_allow_n", 1, time.Minute, 1)
 	if !allow {
 		t.Fatalf("rate limited with rate %d", rate)
 	}
 	if rate != 1 {
 		t.Fatalf("got %d, wanted 1", rate)
 	}
-	dur := time.Duration(reset-time.Now().Unix()) * time.Second
-	if dur > time.Minute {
-		t.Fatalf("got %s, wanted <= %s", dur, time.Minute)
+	if delay > time.Minute {
+		t.Fatalf("got %s, wanted <= %s", delay, time.Minute)
 	}
 
 	l.AllowN("test_allow_n", 1, time.Minute, 2)
 
-	rate, reset, allow = l.AllowN("test_allow_n", 1, time.Minute, 0)
+	rate, delay, allow = l.AllowN("test_allow_n", 1, time.Minute, 0)
 	if allow {
 		t.Fatalf("should rate limit with rate %d", rate)
 	}
 	if rate != 3 {
 		t.Fatalf("got %d, wanted 3", rate)
 	}
-	dur = time.Duration(reset-time.Now().Unix()) * time.Second
-	if dur > time.Minute {
-		t.Fatalf("got %s, wanted <= %s", dur, time.Minute)
+	if delay > time.Minute {
+		t.Fatalf("got %s, wanted <= %s", delay, time.Minute)
 	}
 }
 

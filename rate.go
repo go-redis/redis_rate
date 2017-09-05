@@ -62,10 +62,13 @@ func (l *Limiter) ResetRate(name string, rateLimit rate.Limit) error {
 // AllowN reports whether an event with given name may happen at time now.
 // It allows up to maxn events within duration dur, with each interaction
 // incrementing the limit by n.
-func (l *Limiter) AllowN(name string, maxn int64, dur time.Duration, n int64) (count, reset int64, allow bool) {
+func (l *Limiter) AllowN(
+	name string, maxn int64, dur time.Duration, n int64,
+) (count int64, delay time.Duration, allow bool) {
 	udur := int64(dur / time.Second)
-	slot := time.Now().Unix() / udur
-	reset = (slot + 1) * udur
+	utime := time.Now().Unix()
+	slot := utime / udur
+	delay = time.Duration((slot+1)*udur-utime) * time.Second
 
 	if l.Fallback != nil {
 		allow = l.Fallback.Allow()
@@ -77,21 +80,21 @@ func (l *Limiter) AllowN(name string, maxn int64, dur time.Duration, n int64) (c
 		allow = count <= maxn
 	}
 
-	return count, reset, allow
+	return count, delay, allow
 }
 
 // Allow is shorthand for AllowN(name, max, dur, 1).
-func (l *Limiter) Allow(name string, maxn int64, dur time.Duration) (count, reset int64, allow bool) {
+func (l *Limiter) Allow(name string, maxn int64, dur time.Duration) (count int64, delay time.Duration, allow bool) {
 	return l.AllowN(name, maxn, dur, 1)
 }
 
 // AllowMinute is shorthand for Allow(name, maxn, time.Minute).
-func (l *Limiter) AllowMinute(name string, maxn int64) (int64, int64, bool) {
+func (l *Limiter) AllowMinute(name string, maxn int64) (count int64, delay time.Duration, allow bool) {
 	return l.Allow(name, maxn, time.Minute)
 }
 
 // AllowHour is shorthand for Allow(name, maxn, time.Hour).
-func (l *Limiter) AllowHour(name string, maxn int64) (int64, int64, bool) {
+func (l *Limiter) AllowHour(name string, maxn int64) (count int64, delay time.Duration, allow bool) {
 	return l.Allow(name, maxn, time.Hour)
 }
 
