@@ -1,6 +1,7 @@
 # Rate limiting for go-redis
 
 [![Build Status](https://travis-ci.org/go-redis/redis_rate.svg?branch=master)](https://travis-ci.org/go-redis/redis_rate)
+[![GoDoc](https://godoc.org/github.com/go-redis/redis_rate?status.svg)](https://godoc.org/github.com/go-redis/redis_rate)
 
 ```go
 package main
