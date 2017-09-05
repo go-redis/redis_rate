@@ -21,11 +21,13 @@ func handler(w http.ResponseWriter, req *http.Request, rateLimiter *redis_rate.L
     userID := "user-12345"
     limit := int64(5)
 
-    rate, reset, allowed := rateLimiter.AllowMinute(userID, limit)
+    rate, delay, allowed := rateLimiter.AllowMinute(userID, limit)
     if !allowed {
-        w.Header().Set("X-RateLimit-Limit", strconv.FormatInt(limit, 10))
-        w.Header().Set("X-RateLimit-Remaining", strconv.FormatInt(limit-rate, 10))
-        w.Header().Set("X-RateLimit-Reset", strconv.FormatInt(reset, 10))
+        h := w.Header()
+        h.Set("X-RateLimit-Limit", strconv.FormatInt(limit, 10))
+        h.Set("X-RateLimit-Remaining", strconv.FormatInt(limit-rate, 10))
+        delaySec := int64(delay/time.Second)
+        h.Set("X-RateLimit-Delay", strconv.FormatInt(delaySec, 10))
         http.Error(w, "API rate limit exceeded.", 429)
         return
     }
@@ -39,9 +41,9 @@ func statusHandler(w http.ResponseWriter, req *http.Request, rateLimiter *redis_
     limit := int64(5)
 
     // With n=0 we just retrieve the current limit.
-    rate, reset, allowed := rateLimiter.AllowN(userID, limit, time.Minute, 0)
+    rate, delay, allowed := rateLimiter.AllowN(userID, limit, time.Minute, 0)
     fmt.Fprintf(w, "Current rate: %d", rate)
-    fmt.Fprintf(w, "Reset: %d", reset)
+    fmt.Fprintf(w, "Delay: %s", delay)
     fmt.Fprintf(w, "Allowed: %v", allowed)
 }
 
