@@ -54,20 +54,20 @@ func main() {
             "server1": "localhost:6379",
         },
     })
-    limiter := rate.NewLimiter(ring)
-    // Optional.
-    limiter.Fallback = timerate.NewLimiter(rate.Every(time.Second), 100)
+	limiter := redis_rate.NewLimiter(ring)
+	// Optional.
+	limiter.Fallback = rate.NewLimiter(rate.Every(time.Second), 100)
 
-    http.HandleFunc("/", func(w http.ResponseWriter, req *http.Request) {
-        handler(w, req, limiter)
-    })
+	http.HandleFunc("/", func(w http.ResponseWriter, req *http.Request) {
+		handler(w, req, limiter)
+	})
 
-    http.HandleFunc("/status", func(w http.ResponseWriter, req *http.Request) {
-        statusHandler(w, req, limiter)
-    })
+	http.HandleFunc("/status", func(w http.ResponseWriter, req *http.Request) {
+		statusHandler(w, req, limiter)
+	})
 
-    http.HandleFunc("/favicon.ico", http.NotFound)
-    log.Println("listening on localhost:8888...")
-    log.Println(http.ListenAndServe("localhost:8888", nil))
+	http.HandleFunc("/favicon.ico", http.NotFound)
+	log.Println("listening on localhost:8888...")
+	log.Println(http.ListenAndServe("localhost:8888", nil))
 }
 ```
