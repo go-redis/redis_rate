@@ -5,9 +5,9 @@ services:
   - redis-server
 
 go:
-  - 1.7
-  - 1.8
-  - 1.9
+  - 1.10.x
+  - 1.11.x
+  - 1.12.x
   - tip
 
 matrix:
@@ -17,3 +17,4 @@ matrix:
 install:
   - go get github.com/go-redis/redis
   - go get golang.org/x/time/rate
+  - go get github.com/gordonklaus/ineffassign
