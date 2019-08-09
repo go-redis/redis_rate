@@ -4,7 +4,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/go-redis/redis"
+	"github.com/go-redis/redis/v7"
 	"golang.org/x/time/rate"
 
 	"github.com/go-redis/redis_rate/v7"

@@ -14,8 +14,8 @@ import (
     "time"
 
     "golang.org/x/time/rate"
-    "github.com/go-redis/redis_rate"
-    "github.com/go-redis/redis"
+    "github.com/go-redis/redis_rate/v7"
+    "github.com/go-redis/redis/v7"
 )
 
 func handler(w http.ResponseWriter, req *http.Request, rateLimiter *redis_rate.Limiter) {
@@ -57,15 +57,15 @@ func main() {
     limiter := redis_rate.NewLimiter(ring)
     // Optional.
     limiter.Fallback = rate.NewLimiter(rate.Every(time.Second), 100)
-    
+
     http.HandleFunc("/", func(w http.ResponseWriter, req *http.Request) {
         handler(w, req, limiter)
     })
-    
+
     http.HandleFunc("/status", func(w http.ResponseWriter, req *http.Request) {
         statusHandler(w, req, limiter)
     })
-    
+
     http.HandleFunc("/favicon.ico", http.NotFound)
     log.Println("listening on localhost:8888...")
     log.Println(http.ListenAndServe("localhost:8888", nil))
