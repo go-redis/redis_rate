@@ -1,154 +1,102 @@
 package redis_rate
 
 import (
-	"fmt"
+	"strconv"
 	"time"
 
 	"github.com/go-redis/redis/v7"
-	"golang.org/x/time/rate"
 )
 
-const redisPrefix = "rate"
+const redisPrefix = "rate:"
 
 type rediser interface {
-	Del(...string) *redis.IntCmd
-	Pipelined(func(pipe redis.Pipeliner) error) ([]redis.Cmder, error)
+	Eval(script string, keys []string, args ...interface{}) *redis.Cmd
+	EvalSha(sha1 string, keys []string, args ...interface{}) *redis.Cmd
+	ScriptExists(hashes ...string) *redis.BoolSliceCmd
+	ScriptLoad(script string) *redis.StringCmd
+}
+
+type Limit struct {
+	Rate   int
+	Period time.Duration
+	Burst  int
 }
 
 // Limiter controls how frequently events are allowed to happen.
 type Limiter struct {
-	redis rediser
-
-	// Optional fallback limiter used when Redis is unavailable.
-	Fallback *rate.Limiter
+	rdb   rediser
+	limit *Limit
 }
 
-func NewLimiter(redis rediser) *Limiter {
+// NewLimiter returns a new Limiter that allows events up to rate r
+// and permits bursts of at most b tokens.
+func NewLimiter(rdb rediser, limit *Limit) *Limiter {
 	return &Limiter{
-		redis: redis,
+		rdb:   rdb,
+		limit: limit,
 	}
 }
 
-// Reset resets the rate limit for the name in the given rate limit period.
-func (l *Limiter) Reset(name string, period time.Duration) error {
-	secs := int64(period / time.Second)
-	slot := time.Now().Unix() / secs
-
-	name = allowName(name, slot)
-	return l.redis.Del(name).Err()
+// Allow is shorthand for AllowN(key, 1).
+func (l *Limiter) Allow(key string) (*Result, error) {
+	return l.AllowN(key, 1)
 }
 
-// ResetRate resets the rate limit for the name and limit.
-func (l *Limiter) ResetRate(name string, rateLimit rate.Limit) error {
-	if rateLimit == 0 {
-		return nil
-	}
-	if rateLimit == rate.Inf {
-		return nil
+// AllowN reports whether n events may happen at time now.
+func (l *Limiter) AllowN(key string, n int) (*Result, error) {
+	values := []interface{}{l.limit.Burst, l.limit.Rate, l.limit.Period.Seconds(), n}
+	v, err := gcra.Run(l.rdb, []string{redisPrefix + key}, values...).Result()
+	if err != nil {
+		return nil, err
 	}
 
-	_, period := limitPeriod(rateLimit)
-	slot := time.Now().UnixNano() / period.Nanoseconds()
+	values = v.([]interface{})
 
-	name = allowRateName(name, period, slot)
-	return l.redis.Del(name).Err()
-}
-
-// AllowN reports whether an event with given name may happen at time now.
-// It allows up to maxn events within period, with each interaction
-// incrementing the limit by n.
-func (l *Limiter) AllowN(
-	name string, maxn int64, period time.Duration, n int64,
-) (count int64, delay time.Duration, allow bool) {
-	secs := int64(period / time.Second)
-	utime := time.Now().Unix()
-	slot := utime / secs
-	delay = time.Duration((slot+1)*secs-utime) * time.Second
-
-	if l.Fallback != nil {
-		allow = l.Fallback.Allow()
+	retryAfter, err := strconv.ParseFloat(values[2].(string), 64)
+	if err != nil {
+		return nil, err
 	}
 
-	name = allowName(name, slot)
-	count, err := l.incr(name, period, n)
-	if err == nil {
-		allow = count <= maxn
+	resetAfter, err := strconv.ParseFloat(values[3].(string), 64)
+	if err != nil {
+		return nil, err
 	}
 
-	return count, delay, allow
-}
-
-// Allow is shorthand for AllowN(name, max, period, 1).
-func (l *Limiter) Allow(name string, maxn int64, period time.Duration) (count int64, delay time.Duration, allow bool) {
-	return l.AllowN(name, maxn, period, 1)
-}
-
-// AllowMinute is shorthand for Allow(name, maxn, time.Minute).
-func (l *Limiter) AllowMinute(name string, maxn int64) (count int64, delay time.Duration, allow bool) {
-	return l.Allow(name, maxn, time.Minute)
-}
-
-// AllowHour is shorthand for Allow(name, maxn, time.Hour).
-func (l *Limiter) AllowHour(name string, maxn int64) (count int64, delay time.Duration, allow bool) {
-	return l.Allow(name, maxn, time.Hour)
-}
-
-// AllowRate reports whether an event may happen at time now.
-// It allows up to rateLimit events each second.
-func (l *Limiter) AllowRate(name string, rateLimit rate.Limit) (delay time.Duration, allow bool) {
-	if rateLimit == 0 {
-		return 0, false
+	res := &Result{
+		Allowed:    values[0].(int64) == 0,
+		Remaining:  int(values[1].(int64)),
+		RetryAfter: dur(retryAfter),
+		ResetAfter: dur(resetAfter),
 	}
-	if rateLimit == rate.Inf {
-		return 0, true
-	}
-
-	limit, period := limitPeriod(rateLimit)
-	now := time.Now()
-	slot := now.UnixNano() / period.Nanoseconds()
-
-	name = allowRateName(name, period, slot)
-	count, err := l.incr(name, period, 1)
-	if err == nil {
-		allow = count <= limit
-	} else if l.Fallback != nil {
-		allow = l.Fallback.Allow()
-	}
-
-	if !allow {
-		delay = time.Duration(slot+1)*period - time.Duration(now.UnixNano())
-	}
-
-	return delay, allow
+	return res, nil
 }
 
-func limitPeriod(rl rate.Limit) (limit int64, period time.Duration) {
-	period = time.Second
-	if rl < 1 {
-		limit = 1
-		period *= time.Duration(1 / rl)
-	} else {
-		limit = int64(rl)
+func dur(f float64) time.Duration {
+	if f == -1 {
+		return -1
 	}
-	return limit, period
+	return time.Duration(f * float64(time.Second))
 }
 
-func (l *Limiter) incr(name string, period time.Duration, n int64) (int64, error) {
-	var incr *redis.IntCmd
-	_, err := l.redis.Pipelined(func(pipe redis.Pipeliner) error {
-		incr = pipe.IncrBy(name, n)
-		pipe.Expire(name, period+30*time.Second)
-		return nil
-	})
+type Result struct {
+	// Allowed reports whether event may happen at time now.
+	Allowed bool
 
-	rate, _ := incr.Result()
-	return rate, err
-}
+	// Remaining is the maximum number of requests that could be
+	// permitted instantaneously for this key given the current
+	// state. For example, if a rate limiter allows 10 requests per
+	// second and has already received 6 requests for this key this
+	// second, Remaining would be 4.
+	Remaining int
 
-func allowName(name string, slot int64) string {
-	return fmt.Sprintf("%s:%s-%d", redisPrefix, name, slot)
-}
+	// RetryAfter is the time until the next request will be permitted.
+	// It should be -1 unless the rate limit has been exceeded.
+	RetryAfter time.Duration
 
-func allowRateName(name string, period time.Duration, slot int64) string {
-	return fmt.Sprintf("%s:%s-%d-%d", redisPrefix, name, period, slot)
+	// ResetAfter is the time until the RateLimiter returns to its
+	// initial state for a given key. For example, if a rate limiter
+	// manages requests per second and received one request 200ms ago,
+	// Reset would return 800ms. You can also think of this as the time
+	// until Limit and Remaining will be equal.
+	ResetAfter time.Duration
 }

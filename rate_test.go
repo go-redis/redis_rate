@@ -5,136 +5,65 @@ import (
 	"time"
 
 	"github.com/go-redis/redis/v7"
-	"golang.org/x/time/rate"
+	"github.com/stretchr/testify/assert"
 
 	"github.com/go-redis/redis_rate/v7"
 )
 
-func rateLimiter() *redis_rate.Limiter {
+func rateLimiter(limit *redis_rate.Limit) *redis_rate.Limiter {
 	ring := redis.NewRing(&redis.RingOptions{
 		Addrs: map[string]string{"server0": ":6379"},
 	})
 	if err := ring.FlushDb().Err(); err != nil {
 		panic(err)
 	}
-	return redis_rate.NewLimiter(ring)
+	return redis_rate.NewLimiter(ring, limit)
 }
 
 func TestAllow(t *testing.T) {
-	l := rateLimiter()
+	l := rateLimiter(&redis_rate.Limit{
+		Burst:  10,
+		Rate:   10,
+		Period: time.Second,
+	})
 
-	rate, delay, allow := l.Allow("test_id", 1, time.Minute)
-	if !allow {
-		t.Fatalf("rate limited with rate %d", rate)
-	}
-	if rate != 1 {
-		t.Fatalf("got %d, wanted 1", rate)
-	}
-	if delay > time.Minute {
-		t.Fatalf("got %s, wanted <= %s", delay, time.Minute)
-	}
+	res, err := l.Allow("test_id")
+	assert.Nil(t, err)
+	assert.True(t, res.Allowed)
+	assert.Equal(t, res.Remaining, 9)
+	assert.Equal(t, res.RetryAfter, time.Duration(-1))
+	assert.InDelta(t, res.ResetAfter, 100*time.Millisecond, float64(10*time.Millisecond))
 
-	rate, _, allow = l.Allow("test_id", 1, time.Minute)
-	if allow {
-		t.Fatalf("not rate limited with rate %d", rate)
-	}
-	if rate != 2 {
-		t.Fatalf("got %d, wanted 2", rate)
-	}
+	res, err = l.AllowN("test_id", 2)
+	assert.Nil(t, err)
+	assert.True(t, res.Allowed)
+	assert.Equal(t, res.Remaining, 7)
+	assert.Equal(t, res.RetryAfter, time.Duration(-1))
+	assert.InDelta(t, res.ResetAfter, 300*time.Millisecond, float64(10*time.Millisecond))
+
+	res, err = l.AllowN("test_id", 1000)
+	assert.Nil(t, err)
+	assert.False(t, res.Allowed)
+	assert.Equal(t, res.Remaining, 0)
+	assert.InDelta(t, res.RetryAfter, 99*time.Second, float64(time.Second))
+	assert.InDelta(t, res.ResetAfter, 300*time.Millisecond, float64(10*time.Millisecond))
 }
 
-func TestAllowRateMinute(t *testing.T) {
-	const n = 2
-	const dur = time.Minute
+func BenchmarkAllow(b *testing.B) {
+	l := rateLimiter(&redis_rate.Limit{
+		Burst:  1000,
+		Rate:   1000,
+		Period: time.Second,
+	})
 
-	l := rateLimiter()
+	b.ResetTimer()
 
-	_, allow := l.AllowRate("rate", n*rate.Every(dur))
-	if !allow {
-		t.Fatal("rate limited")
-	}
-
-	delay, allow := l.AllowRate("rate", n*rate.Every(dur))
-	if allow {
-		t.Fatal("not rate limited")
-	}
-	if !durEqual(delay, dur/n) {
-		t.Fatalf("got %s, wanted 0 < dur < %s", delay, dur/n)
-	}
-}
-
-func TestAllowRateSecond(t *testing.T) {
-	const n = 10
-	const dur = time.Second
-
-	l := rateLimiter()
-
-	for i := 0; i < n; i++ {
-		_, allow := l.AllowRate("rate", n*rate.Every(dur))
-		if !allow {
-			t.Fatal("rate limited")
+	b.RunParallel(func(pb *testing.PB) {
+		for pb.Next() {
+			_, err := l.Allow("foo")
+			if err != nil {
+				b.Fatal(err)
+			}
 		}
-	}
-
-	delay, allow := l.AllowRate("rate", n*rate.Every(dur))
-	if allow {
-		t.Fatal("not rate limited")
-	}
-	if !durEqual(delay, time.Second) {
-		t.Fatalf("got %s, wanted 0 < dur < %s", delay, dur)
-	}
-}
-
-func TestRedisIsDown(t *testing.T) {
-	ring := redis.NewRing(&redis.RingOptions{})
-	l := redis_rate.NewLimiter(ring)
-	l.Fallback = rate.NewLimiter(rate.Every(time.Second), 1)
-
-	rate, _, allow := l.AllowMinute("test_id", 1)
-	if !allow {
-		t.Fatalf("rate limited with rate %d", rate)
-	}
-	if rate != 0 {
-		t.Fatalf("got %d, wanted 0", rate)
-	}
-
-	rate, _, allow = l.AllowMinute("test_id", 1)
-	if allow {
-		t.Fatalf("not rate limited with rate %d", rate)
-	}
-	if rate != 0 {
-		t.Fatalf("got %d, wanted 0", rate)
-	}
-}
-
-func TestAllowN(t *testing.T) {
-	l := rateLimiter()
-
-	rate, delay, allow := l.AllowN("test_allow_n", 1, time.Minute, 1)
-	if !allow {
-		t.Fatalf("rate limited with rate %d", rate)
-	}
-	if rate != 1 {
-		t.Fatalf("got %d, wanted 1", rate)
-	}
-	if delay > time.Minute {
-		t.Fatalf("got %s, wanted <= %s", delay, time.Minute)
-	}
-
-	l.AllowN("test_allow_n", 1, time.Minute, 2)
-
-	rate, delay, allow = l.AllowN("test_allow_n", 1, time.Minute, 0)
-	if allow {
-		t.Fatalf("should rate limit with rate %d", rate)
-	}
-	if rate != 3 {
-		t.Fatalf("got %d, wanted 3", rate)
-	}
-	if delay > time.Minute {
-		t.Fatalf("got %s, wanted <= %s", delay, time.Minute)
-	}
-}
-
-func durEqual(got, wanted time.Duration) bool {
-	return got > 0 && got < wanted
+	})
 }

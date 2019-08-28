@@ -3,71 +3,35 @@
 [![Build Status](https://travis-ci.org/go-redis/redis_rate.svg?branch=master)](https://travis-ci.org/go-redis/redis_rate)
 [![GoDoc](https://godoc.org/github.com/go-redis/redis_rate?status.svg)](https://godoc.org/github.com/go-redis/redis_rate)
 
+This package is based on [rwz/redis-gcra](https://github.com/rwz/redis-gcra) and implements [GCRA](https://en.wikipedia.org/wiki/Generic_cell_rate_algorithm) for rate limiting based on Redis. The code requires Redis version 3.2 or newer since it relies on [replicate_commands](https://redis.io/commands/eval#replicating-commands-instead-of-scripts) feature.
+
 ```go
-package main
+package redis_rate_test
 
 import (
-    "fmt"
-    "log"
-    "net/http"
-    "strconv"
-    "time"
+	"fmt"
+	"time"
 
-    "golang.org/x/time/rate"
-    "github.com/go-redis/redis_rate/v7"
-    "github.com/go-redis/redis/v7"
+	"github.com/go-redis/redis/v7"
+	"github.com/go-redis/redis_rate/v7"
 )
 
-func handler(w http.ResponseWriter, req *http.Request, rateLimiter *redis_rate.Limiter) {
-    userID := "user-12345"
-    limit := int64(5)
+func ExampleNewLimiter() {
+	rdb := redis.NewClient(&redis.Options{
+		Addr: "localhost:6379",
+	})
+	_ = rdb.FlushDB().Err()
 
-    rate, delay, allowed := rateLimiter.AllowMinute(userID, limit)
-    if !allowed {
-        h := w.Header()
-        h.Set("X-RateLimit-Limit", strconv.FormatInt(limit, 10))
-        h.Set("X-RateLimit-Remaining", strconv.FormatInt(limit-rate, 10))
-        delaySec := int64(delay/time.Second)
-        h.Set("X-RateLimit-Delay", strconv.FormatInt(delaySec, 10))
-        http.Error(w, "API rate limit exceeded.", 429)
-        return
-    }
-
-    fmt.Fprintf(w, "Hello world!\n")
-    fmt.Fprint(w, "Rate limit remaining: ", strconv.FormatInt(limit-rate, 10))
-}
-
-func statusHandler(w http.ResponseWriter, req *http.Request, rateLimiter *redis_rate.Limiter) {
-    userID := "user-12345"
-    limit := int64(5)
-
-    // With n=0 we just retrieve the current limit.
-    rate, delay, allowed := rateLimiter.AllowN(userID, limit, time.Minute, 0)
-    fmt.Fprintf(w, "Current rate: %d", rate)
-    fmt.Fprintf(w, "Delay: %s", delay)
-    fmt.Fprintf(w, "Allowed: %v", allowed)
-}
-
-func main() {
-    ring := redis.NewRing(&redis.RingOptions{
-        Addrs: map[string]string{
-            "server1": "localhost:6379",
-        },
-    })
-    limiter := redis_rate.NewLimiter(ring)
-    // Optional.
-    limiter.Fallback = rate.NewLimiter(rate.Every(time.Second), 100)
-
-    http.HandleFunc("/", func(w http.ResponseWriter, req *http.Request) {
-        handler(w, req, limiter)
-    })
-
-    http.HandleFunc("/status", func(w http.ResponseWriter, req *http.Request) {
-        statusHandler(w, req, limiter)
-    })
-
-    http.HandleFunc("/favicon.ico", http.NotFound)
-    log.Println("listening on localhost:8888...")
-    log.Println(http.ListenAndServe("localhost:8888", nil))
+	limiter := redis_rate.NewLimiter(rdb, &redis_rate.Limit{
+		Burst:  10,
+		Rate:   10,
+		Period: time.Second,
+	})
+	res, err := limiter.Allow("project:123")
+	if err != nil {
+		panic(err)
+	}
+	fmt.Println(res.Allowed, res.Remaining)
+	// Output: true 9
 }
 ```
