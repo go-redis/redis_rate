@@ -1,4 +1,4 @@
-module github.com/go-redis/redis_rate/v7
+module github.com/go-redis/redis_rate/v8
 
 go 1.13
 

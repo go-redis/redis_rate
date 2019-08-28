@@ -7,7 +7,7 @@ import (
 	"github.com/go-redis/redis/v7"
 	"github.com/stretchr/testify/assert"
 
-	"github.com/go-redis/redis_rate/v7"
+	"github.com/go-redis/redis_rate/v8"
 )
 
 func rateLimiter(limit *redis_rate.Limit) *redis_rate.Limiter {
