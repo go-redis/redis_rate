@@ -10,38 +10,35 @@ import (
 	"github.com/go-redis/redis_rate/v8"
 )
 
-func rateLimiter(limit *redis_rate.Limit) *redis_rate.Limiter {
+func rateLimiter() *redis_rate.Limiter {
 	ring := redis.NewRing(&redis.RingOptions{
 		Addrs: map[string]string{"server0": ":6379"},
 	})
-	if err := ring.FlushDb().Err(); err != nil {
+	if err := ring.FlushDB().Err(); err != nil {
 		panic(err)
 	}
-	return redis_rate.NewLimiter(ring, limit)
+	return redis_rate.NewLimiter(ring)
 }
 
 func TestAllow(t *testing.T) {
-	l := rateLimiter(&redis_rate.Limit{
-		Burst:  10,
-		Rate:   10,
-		Period: time.Second,
-	})
+	l := rateLimiter()
+	limit := redis_rate.PerSecond(10)
 
-	res, err := l.Allow("test_id")
+	res, err := l.Allow("test_id", limit)
 	assert.Nil(t, err)
 	assert.True(t, res.Allowed)
 	assert.Equal(t, res.Remaining, 9)
 	assert.Equal(t, res.RetryAfter, time.Duration(-1))
 	assert.InDelta(t, res.ResetAfter, 100*time.Millisecond, float64(10*time.Millisecond))
 
-	res, err = l.AllowN("test_id", 2)
+	res, err = l.AllowN("test_id", limit, 2)
 	assert.Nil(t, err)
 	assert.True(t, res.Allowed)
 	assert.Equal(t, res.Remaining, 7)
 	assert.Equal(t, res.RetryAfter, time.Duration(-1))
 	assert.InDelta(t, res.ResetAfter, 300*time.Millisecond, float64(10*time.Millisecond))
 
-	res, err = l.AllowN("test_id", 1000)
+	res, err = l.AllowN("test_id", limit, 1000)
 	assert.Nil(t, err)
 	assert.False(t, res.Allowed)
 	assert.Equal(t, res.Remaining, 0)
@@ -50,17 +47,14 @@ func TestAllow(t *testing.T) {
 }
 
 func BenchmarkAllow(b *testing.B) {
-	l := rateLimiter(&redis_rate.Limit{
-		Burst:  1000,
-		Rate:   1000,
-		Period: time.Second,
-	})
+	l := rateLimiter()
+	limit := redis_rate.PerSecond(10000)
 
 	b.ResetTimer()
 
 	b.RunParallel(func(pb *testing.PB) {
 		for pb.Next() {
-			_, err := l.Allow("foo")
+			_, err := l.Allow("foo", limit)
 			if err != nil {
 				b.Fatal(err)
 			}
