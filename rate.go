@@ -86,6 +86,7 @@ func (l *Limiter) AllowN(key string, limit *Limit, n int) (*Result, error) {
 	}
 
 	res := &Result{
+		Limit:      limit,
 		Allowed:    values[0].(int64) == 0,
 		Remaining:  int(values[1].(int64)),
 		RetryAfter: dur(retryAfter),
@@ -102,6 +103,9 @@ func dur(f float64) time.Duration {
 }
 
 type Result struct {
+	// Limit is the limit that was used to obtain this result.
+	Limit *Limit
+
 	// Allowed reports whether event may happen at time now.
 	Allowed bool
 
