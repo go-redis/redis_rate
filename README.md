@@ -5,6 +5,23 @@
 
 This package is based on [rwz/redis-gcra](https://github.com/rwz/redis-gcra) and implements [GCRA](https://en.wikipedia.org/wiki/Generic_cell_rate_algorithm) (aka leaky bucket) for rate limiting based on Redis. The code requires Redis version 3.2 or newer since it relies on [replicate_commands](https://redis.io/commands/eval#replicating-commands-instead-of-scripts) feature.
 
+## Installation
+
+redus_rate requires a Go version with [Modules](https://github.com/golang/go/wiki/Modules) support and uses import versioning. So please make sure to initialize a Go module before installing redis_rate:
+
+``` shell
+go mod init github.com/my/repo
+go get github.com/go-redis/redis_rate/v8
+```
+
+Import:
+
+``` go
+import "github.com/go-redis/redis_rate/v8"
+```
+
+## Example
+
 ``` go
 package redis_rate_test
 
