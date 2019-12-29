@@ -22,29 +22,52 @@ type Limit struct {
 	Burst  int
 }
 
-// Limiter controls how frequently events are allowed to happen.
-type Limiter struct {
-	rdb   rediser
-	limit *Limit
+func PerSecond(rate int) *Limit {
+	return &Limit{
+		Rate:   rate,
+		Period: time.Second,
+		Burst:  rate,
+	}
 }
 
-// NewLimiter returns a new Limiter that allows events up to rate r
-// and permits bursts of at most b tokens.
-func NewLimiter(rdb rediser, limit *Limit) *Limiter {
+func PerMinute(rate int) *Limit {
+	return &Limit{
+		Rate:   rate,
+		Period: time.Minute,
+		Burst:  rate,
+	}
+}
+
+func PerHour(rate int) *Limit {
+	return &Limit{
+		Rate:   rate,
+		Period: time.Hour,
+		Burst:  rate,
+	}
+}
+
+//------------------------------------------------------------------------------
+
+// Limiter controls how frequently events are allowed to happen.
+type Limiter struct {
+	rdb rediser
+}
+
+// NewLimiter returns a new Limiter.
+func NewLimiter(rdb rediser) *Limiter {
 	return &Limiter{
-		rdb:   rdb,
-		limit: limit,
+		rdb: rdb,
 	}
 }
 
 // Allow is shorthand for AllowN(key, 1).
-func (l *Limiter) Allow(key string) (*Result, error) {
-	return l.AllowN(key, 1)
+func (l *Limiter) Allow(key string, limit *Limit) (*Result, error) {
+	return l.AllowN(key, limit, 1)
 }
 
 // AllowN reports whether n events may happen at time now.
-func (l *Limiter) AllowN(key string, n int) (*Result, error) {
-	values := []interface{}{l.limit.Burst, l.limit.Rate, l.limit.Period.Seconds(), n}
+func (l *Limiter) AllowN(key string, limit *Limit, n int) (*Result, error) {
+	values := []interface{}{limit.Burst, limit.Rate, limit.Period.Seconds(), n}
 	v, err := gcra.Run(l.rdb, []string{redisPrefix + key}, values...).Result()
 	if err != nil {
 		return nil, err
