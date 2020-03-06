@@ -7,7 +7,7 @@ This package is based on [rwz/redis-gcra](https://github.com/rwz/redis-gcra) and
 
 ## Installation
 
-redus_rate requires a Go version with [Modules](https://github.com/golang/go/wiki/Modules) support and uses import versioning. So please make sure to initialize a Go module before installing redis_rate:
+redis_rate requires a Go version with [Modules](https://github.com/golang/go/wiki/Modules) support and uses import versioning. So please make sure to initialize a Go module before installing redis_rate:
 
 ``` shell
 go mod init github.com/my/repo
