@@ -5,7 +5,7 @@ import (
 	"fmt"
 
 	"github.com/go-redis/redis/v8"
-	"github.com/go-redis/redis_rate/v8"
+	"github.com/go-redis/redis_rate/v9"
 )
 
 func ExampleNewLimiter() {
