@@ -1,20 +1,22 @@
 package redis_rate_test
 
 import (
+	"context"
 	"fmt"
 
-	"github.com/go-redis/redis/v7"
+	"github.com/go-redis/redis/v8"
 	"github.com/go-redis/redis_rate/v8"
 )
 
 func ExampleNewLimiter() {
+	ctx := context.Background()
 	rdb := redis.NewClient(&redis.Options{
 		Addr: "localhost:6379",
 	})
-	_ = rdb.FlushDB().Err()
+	_ = rdb.FlushDB(ctx).Err()
 
 	limiter := redis_rate.NewLimiter(rdb)
-	res, err := limiter.Allow("project:123", redis_rate.PerSecond(10))
+	res, err := limiter.Allow(ctx, "project:123", redis_rate.PerSecond(10))
 	if err != nil {
 		panic(err)
 	}

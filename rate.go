@@ -1,19 +1,20 @@
 package redis_rate
 
 import (
+	"context"
 	"strconv"
 	"time"
 
-	"github.com/go-redis/redis/v7"
+	"github.com/go-redis/redis/v8"
 )
 
 const redisPrefix = "rate:"
 
 type rediser interface {
-	Eval(script string, keys []string, args ...interface{}) *redis.Cmd
-	EvalSha(sha1 string, keys []string, args ...interface{}) *redis.Cmd
-	ScriptExists(hashes ...string) *redis.BoolSliceCmd
-	ScriptLoad(script string) *redis.StringCmd
+	Eval(ctx context.Context, script string, keys []string, args ...interface{}) *redis.Cmd
+	EvalSha(ctx context.Context, sha1 string, keys []string, args ...interface{}) *redis.Cmd
+	ScriptExists(ctx context.Context, hashes ...string) *redis.BoolSliceCmd
+	ScriptLoad(ctx context.Context, script string) *redis.StringCmd
 }
 
 type Limit struct {
@@ -61,14 +62,14 @@ func NewLimiter(rdb rediser) *Limiter {
 }
 
 // Allow is shorthand for AllowN(key, 1).
-func (l *Limiter) Allow(key string, limit *Limit) (*Result, error) {
-	return l.AllowN(key, limit, 1)
+func (l *Limiter) Allow(ctx context.Context, key string, limit *Limit) (*Result, error) {
+	return l.AllowN(ctx, key, limit, 1)
 }
 
 // AllowN reports whether n events may happen at time now.
-func (l *Limiter) AllowN(key string, limit *Limit, n int) (*Result, error) {
+func (l *Limiter) AllowN(ctx context.Context, key string, limit *Limit, n int) (*Result, error) {
 	values := []interface{}{limit.Burst, limit.Rate, limit.Period.Seconds(), n}
-	v, err := gcra.Run(l.rdb, []string{redisPrefix + key}, values...).Result()
+	v, err := gcra.Run(ctx, l.rdb, []string{redisPrefix + key}, values...).Result()
 	if err != nil {
 		return nil, err
 	}
