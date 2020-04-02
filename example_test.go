@@ -20,6 +20,6 @@ func ExampleNewLimiter() {
 	if err != nil {
 		panic(err)
 	}
-	fmt.Println(res.Allowed, res.Remaining)
-	// Output: true 9
+	fmt.Println("allowed", res.Allowed, "remaining", res.Remaining)
+	// Output: allowed 1 remaining 9
 }

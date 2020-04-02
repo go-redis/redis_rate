@@ -61,15 +61,20 @@ func NewLimiter(rdb rediser) *Limiter {
 	}
 }
 
-// Allow is shorthand for AllowN(key, 1).
+// Allow is a shortcut for AllowN(ctx, key, limit, 1).
 func (l *Limiter) Allow(ctx context.Context, key string, limit *Limit) (*Result, error) {
 	return l.AllowN(ctx, key, limit, 1)
 }
 
 // AllowN reports whether n events may happen at time now.
-func (l *Limiter) AllowN(ctx context.Context, key string, limit *Limit, n int) (*Result, error) {
+func (l *Limiter) AllowN(
+	ctx context.Context,
+	key string,
+	limit *Limit,
+	n int,
+) (*Result, error) {
 	values := []interface{}{limit.Burst, limit.Rate, limit.Period.Seconds(), n}
-	v, err := gcra.Run(ctx, l.rdb, []string{redisPrefix + key}, values...).Result()
+	v, err := allowN.Run(ctx, l.rdb, []string{redisPrefix + key}, values...).Result()
 	if err != nil {
 		return nil, err
 	}
@@ -88,10 +93,34 @@ func (l *Limiter) AllowN(ctx context.Context, key string, limit *Limit, n int) (
 
 	res := &Result{
 		Limit:      limit,
-		Allowed:    values[0].(int64) == 0,
+		Allowed:    int(values[0].(int64)),
 		Remaining:  int(values[1].(int64)),
 		RetryAfter: dur(retryAfter),
 		ResetAfter: dur(resetAfter),
+	}
+	return res, nil
+}
+
+// AllowAtMostN reports whether at most n events may happen at time now.
+// It returns number of allowed events. RetryAfter and ResetAfter are not set.
+func (l *Limiter) AllowAtMostN(
+	ctx context.Context,
+	key string,
+	limit *Limit,
+	n int,
+) (*Result, error) {
+	values := []interface{}{limit.Burst, limit.Rate, limit.Period.Seconds(), n}
+	v, err := allowAtMost.Run(ctx, l.rdb, []string{redisPrefix + key}, values...).Result()
+	if err != nil {
+		return nil, err
+	}
+
+	values = v.([]interface{})
+
+	res := &Result{
+		Limit:     limit,
+		Allowed:   int(values[0].(int64)),
+		Remaining: int(values[1].(int64)),
 	}
 	return res, nil
 }
@@ -108,7 +137,7 @@ type Result struct {
 	Limit *Limit
 
 	// Allowed reports whether event may happen at time now.
-	Allowed bool
+	Allowed int
 
 	// Remaining is the maximum number of requests that could be
 	// permitted instantaneously for this key given the current
