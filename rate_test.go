@@ -73,6 +73,8 @@ func TestAllowAtMostN(t *testing.T) {
 	assert.Nil(t, err)
 	assert.Equal(t, res.Allowed, 2)
 	assert.Equal(t, res.Remaining, 7)
+	assert.Equal(t, res.RetryAfter, time.Duration(-1))
+	assert.InDelta(t, res.ResetAfter, 300*time.Millisecond, float64(10*time.Millisecond))
 
 	res, err = l.AllowN(ctx, "test_id", limit, 0)
 	assert.Nil(t, err)
@@ -85,6 +87,8 @@ func TestAllowAtMostN(t *testing.T) {
 	assert.Nil(t, err)
 	assert.Equal(t, res.Allowed, 7)
 	assert.Equal(t, res.Remaining, 0)
+	assert.Equal(t, res.RetryAfter, time.Duration(-1))
+	assert.InDelta(t, res.ResetAfter, 999*time.Millisecond, float64(10*time.Millisecond))
 
 	res, err = l.AllowN(ctx, "test_id", limit, 0)
 	assert.Nil(t, err)
@@ -97,6 +101,8 @@ func TestAllowAtMostN(t *testing.T) {
 	assert.Nil(t, err)
 	assert.Equal(t, res.Allowed, 0)
 	assert.Equal(t, res.Remaining, 0)
+	assert.InDelta(t, res.RetryAfter, 99*time.Millisecond, float64(10*time.Millisecond))
+	assert.InDelta(t, res.ResetAfter, 999*time.Millisecond, float64(10*time.Millisecond))
 
 	res, err = l.AllowN(ctx, "test_id", limit, 1000)
 	assert.Nil(t, err)

@@ -102,7 +102,7 @@ func (l *Limiter) AllowN(
 }
 
 // AllowAtMostN reports whether at most n events may happen at time now.
-// It returns number of allowed events. RetryAfter and ResetAfter are not set.
+// It returns number of allowed events that is less than or equal to n.
 func (l *Limiter) AllowAtMostN(
 	ctx context.Context,
 	key string,
@@ -117,10 +117,22 @@ func (l *Limiter) AllowAtMostN(
 
 	values = v.([]interface{})
 
+	retryAfter, err := strconv.ParseFloat(values[2].(string), 64)
+	if err != nil {
+		return nil, err
+	}
+
+	resetAfter, err := strconv.ParseFloat(values[3].(string), 64)
+	if err != nil {
+		return nil, err
+	}
+
 	res := &Result{
-		Limit:     limit,
-		Allowed:   int(values[0].(int64)),
-		Remaining: int(values[1].(int64)),
+		Limit:      limit,
+		Allowed:    int(values[0].(int64)),
+		Remaining:  int(values[1].(int64)),
+		RetryAfter: dur(retryAfter),
+		ResetAfter: dur(resetAfter),
 	}
 	return res, nil
 }

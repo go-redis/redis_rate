@@ -45,17 +45,21 @@ local allow_at = new_tat - burst_offset
 local diff = now - allow_at
 local remaining = math.floor(diff / emission_interval + 0.5)
 
-if remaining >= 0 then
-  local reset_after = new_tat - now
-  redis.call("SET", rate_limit_key, new_tat, "EX", math.ceil(reset_after))
-  local retry_after = -1
-  return {cost, remaining, tostring(retry_after), tostring(reset_after)}
+if remaining < 0 then
+  local reset_after = tat - now
+  local retry_after = diff * -1
+  return {
+    0, -- allowed
+    0, -- remaining
+    tostring(retry_after),
+    tostring(reset_after),
+  }
 end
 
-remaining = 0
-local reset_after = tat - now
-local retry_after = diff * -1
-return {0, remaining, tostring(retry_after), tostring(reset_after)}
+local reset_after = new_tat - now
+redis.call("SET", rate_limit_key, new_tat, "EX", math.ceil(reset_after))
+local retry_after = -1
+return {cost, remaining, tostring(retry_after), tostring(reset_after)}
 `)
 
 var allowAtMost = redis.NewScript(`
@@ -96,9 +100,13 @@ local diff = now - (tat - burst_offset)
 local remaining = math.floor(diff / emission_interval + 0.5)
 
 if remaining == 0 then
+  local reset_after = tat - now
+  local retry_after = emission_interval - diff
   return {
     0, -- allowed
     0, -- remaining
+    tostring(retry_after),
+    tostring(reset_after),
   }
 end
 
@@ -118,5 +126,7 @@ redis.call("SET", rate_limit_key, new_tat, "EX", math.ceil(reset_after))
 return {
   cost,
   remaining,
+  tostring(-1),
+  tostring(reset_after),
 }
 `)
