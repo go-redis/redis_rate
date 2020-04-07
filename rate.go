@@ -101,9 +101,9 @@ func (l *Limiter) AllowN(
 	return res, nil
 }
 
-// AllowAtMostN reports whether at most n events may happen at time now.
+// AllowAtMost reports whether at most n events may happen at time now.
 // It returns number of allowed events that is less than or equal to n.
-func (l *Limiter) AllowAtMostN(
+func (l *Limiter) AllowAtMost(
 	ctx context.Context,
 	key string,
 	limit *Limit,

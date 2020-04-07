@@ -56,7 +56,7 @@ func TestAllow(t *testing.T) {
 	assert.InDelta(t, res.ResetAfter, 999*time.Millisecond, float64(10*time.Millisecond))
 }
 
-func TestAllowAtMostN(t *testing.T) {
+func TestAllowAtMost(t *testing.T) {
 	ctx := context.Background()
 
 	l := rateLimiter()
@@ -69,7 +69,7 @@ func TestAllowAtMostN(t *testing.T) {
 	assert.Equal(t, res.RetryAfter, time.Duration(-1))
 	assert.InDelta(t, res.ResetAfter, 100*time.Millisecond, float64(10*time.Millisecond))
 
-	res, err = l.AllowAtMostN(ctx, "test_id", limit, 2)
+	res, err = l.AllowAtMost(ctx, "test_id", limit, 2)
 	assert.Nil(t, err)
 	assert.Equal(t, res.Allowed, 2)
 	assert.Equal(t, res.Remaining, 7)
@@ -83,7 +83,7 @@ func TestAllowAtMostN(t *testing.T) {
 	assert.Equal(t, res.RetryAfter, time.Duration(-1))
 	assert.InDelta(t, res.ResetAfter, 300*time.Millisecond, float64(10*time.Millisecond))
 
-	res, err = l.AllowAtMostN(ctx, "test_id", limit, 10)
+	res, err = l.AllowAtMost(ctx, "test_id", limit, 10)
 	assert.Nil(t, err)
 	assert.Equal(t, res.Allowed, 7)
 	assert.Equal(t, res.Remaining, 0)
@@ -97,7 +97,7 @@ func TestAllowAtMostN(t *testing.T) {
 	assert.Equal(t, res.RetryAfter, time.Duration(-1))
 	assert.InDelta(t, res.ResetAfter, 999*time.Millisecond, float64(10*time.Millisecond))
 
-	res, err = l.AllowAtMostN(ctx, "test_id", limit, 1000)
+	res, err = l.AllowAtMost(ctx, "test_id", limit, 1000)
 	assert.Nil(t, err)
 	assert.Equal(t, res.Allowed, 0)
 	assert.Equal(t, res.Remaining, 0)
@@ -132,7 +132,7 @@ func BenchmarkAllow(b *testing.B) {
 	})
 }
 
-func BenchmarkAllowAtMostN(b *testing.B) {
+func BenchmarkAllowAtMost(b *testing.B) {
 	ctx := context.Background()
 	l := rateLimiter()
 	limit := redis_rate.PerSecond(1e6)
@@ -141,7 +141,7 @@ func BenchmarkAllowAtMostN(b *testing.B) {
 
 	b.RunParallel(func(pb *testing.PB) {
 		for pb.Next() {
-			res, err := l.AllowAtMostN(ctx, "foo", limit, 1)
+			res, err := l.AllowAtMost(ctx, "foo", limit, 1)
 			if err != nil {
 				b.Fatal(err)
 			}
