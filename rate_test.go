@@ -37,6 +37,15 @@ func TestAllow(t *testing.T) {
 	assert.Equal(t, res.RetryAfter, time.Duration(-1))
 	assert.InDelta(t, res.ResetAfter, 100*time.Millisecond, float64(10*time.Millisecond))
 
+	err = l.Reset(ctx, "test_id")
+	assert.Nil(t, err)
+	res, err = l.Allow(ctx, "test_id", limit)
+	assert.Nil(t, err)
+	assert.Equal(t, res.Allowed, 1)
+	assert.Equal(t, res.Remaining, 9)
+	assert.Equal(t, res.RetryAfter, time.Duration(-1))
+	assert.InDelta(t, res.ResetAfter, 100*time.Millisecond, float64(10*time.Millisecond))
+
 	res, err = l.AllowN(ctx, "test_id", limit, 2)
 	assert.Nil(t, err)
 	assert.Equal(t, res.Allowed, 2)
@@ -57,6 +66,7 @@ func TestAllow(t *testing.T) {
 	assert.Equal(t, res.Remaining, 0)
 	assert.InDelta(t, res.RetryAfter, 99*time.Second, float64(time.Second))
 	assert.InDelta(t, res.ResetAfter, 999*time.Millisecond, float64(10*time.Millisecond))
+
 }
 
 func TestAllowAtMost(t *testing.T) {

@@ -130,3 +130,15 @@ return {
   tostring(reset_after),
 }
 `)
+
+var reset = redis.NewScript(`
+-- this script has side-effects, so it requires replicate commands mode
+redis.replicate_commands()
+
+local rate_limit_key = KEYS[1]
+local tat = redis.call("DEL", rate_limit_key)
+
+return {
+  tat,
+}
+`)

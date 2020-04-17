@@ -158,6 +158,15 @@ func (l Limiter) AllowAtMost(
 	return res, nil
 }
 
+// Reset gets a key and reset all limitations and previous usages
+func (l *Limiter) Reset(ctx context.Context, key string) error {
+	_, err := reset.Run(ctx, l.rdb, []string{redisPrefix + key}, nil).Result()
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
 func dur(f float64) time.Duration {
 	if f == -1 {
 		return -1
