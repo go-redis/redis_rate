@@ -148,7 +148,7 @@ type Result struct {
 	// Limit is the limit that was used to obtain this result.
 	Limit *Limit
 
-	// Allowed reports whether event may happen at time now.
+	// Allowed is the number of events that may happen at time now.
 	Allowed int
 
 	// Remaining is the maximum number of requests that could be
