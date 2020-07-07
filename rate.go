@@ -2,6 +2,7 @@ package redis_rate
 
 import (
 	"context"
+	"fmt"
 	"strconv"
 	"time"
 
@@ -21,6 +22,22 @@ type Limit struct {
 	Rate   int
 	Period time.Duration
 	Burst  int
+}
+
+func (l *Limit) String() string {
+	return fmt.Sprintf("%d req/%s (burst %d)", l.Rate, fmtDur(l.Period), l.Burst)
+}
+
+func fmtDur(d time.Duration) string {
+	switch d {
+	case time.Second:
+		return "s"
+	case time.Minute:
+		return "m"
+	case time.Hour:
+		return "h"
+	}
+	return d.String()
 }
 
 func PerSecond(rate int) *Limit {
