@@ -20,12 +20,16 @@ type rediser interface {
 
 type Limit struct {
 	Rate   int
-	Period time.Duration
 	Burst  int
+	Period time.Duration
 }
 
-func (l *Limit) String() string {
+func (l Limit) String() string {
 	return fmt.Sprintf("%d req/%s (burst %d)", l.Rate, fmtDur(l.Period), l.Burst)
+}
+
+func (l Limit) IsZero() bool {
+	return l == Limit{}
 }
 
 func fmtDur(d time.Duration) string {
@@ -40,24 +44,24 @@ func fmtDur(d time.Duration) string {
 	return d.String()
 }
 
-func PerSecond(rate int) *Limit {
-	return &Limit{
+func PerSecond(rate int) Limit {
+	return Limit{
 		Rate:   rate,
 		Period: time.Second,
 		Burst:  rate,
 	}
 }
 
-func PerMinute(rate int) *Limit {
-	return &Limit{
+func PerMinute(rate int) Limit {
+	return Limit{
 		Rate:   rate,
 		Period: time.Minute,
 		Burst:  rate,
 	}
 }
 
-func PerHour(rate int) *Limit {
-	return &Limit{
+func PerHour(rate int) Limit {
+	return Limit{
 		Rate:   rate,
 		Period: time.Hour,
 		Burst:  rate,
@@ -79,15 +83,15 @@ func NewLimiter(rdb rediser) *Limiter {
 }
 
 // Allow is a shortcut for AllowN(ctx, key, limit, 1).
-func (l *Limiter) Allow(ctx context.Context, key string, limit *Limit) (*Result, error) {
+func (l Limiter) Allow(ctx context.Context, key string, limit Limit) (*Result, error) {
 	return l.AllowN(ctx, key, limit, 1)
 }
 
 // AllowN reports whether n events may happen at time now.
-func (l *Limiter) AllowN(
+func (l Limiter) AllowN(
 	ctx context.Context,
 	key string,
-	limit *Limit,
+	limit Limit,
 	n int,
 ) (*Result, error) {
 	values := []interface{}{limit.Burst, limit.Rate, limit.Period.Seconds(), n}
@@ -120,10 +124,10 @@ func (l *Limiter) AllowN(
 
 // AllowAtMost reports whether at most n events may happen at time now.
 // It returns number of allowed events that is less than or equal to n.
-func (l *Limiter) AllowAtMost(
+func (l Limiter) AllowAtMost(
 	ctx context.Context,
 	key string,
-	limit *Limit,
+	limit Limit,
 	n int,
 ) (*Result, error) {
 	values := []interface{}{limit.Burst, limit.Rate, limit.Period.Seconds(), n}
@@ -163,7 +167,7 @@ func dur(f float64) time.Duration {
 
 type Result struct {
 	// Limit is the limit that was used to obtain this result.
-	Limit *Limit
+	Limit Limit
 
 	// Allowed is the number of events that may happen at time now.
 	Allowed int

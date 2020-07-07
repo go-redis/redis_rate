@@ -25,8 +25,10 @@ func TestAllow(t *testing.T) {
 	ctx := context.Background()
 
 	l := rateLimiter()
+
 	limit := redis_rate.PerSecond(10)
 	assert.Equal(t, limit.String(), "10 req/s (burst 10)")
+	assert.False(t, limit.IsZero())
 
 	res, err := l.Allow(ctx, "test_id", limit)
 	assert.Nil(t, err)
