@@ -115,6 +115,40 @@ func TestAllowAtMost(t *testing.T) {
 	assert.InDelta(t, res.ResetAfter, 999*time.Millisecond, float64(10*time.Millisecond))
 }
 
+func TestInspect(t *testing.T) {
+	ctx := context.Background()
+
+	l := rateLimiter()
+	limit := redis_rate.PerHour(1)
+
+	res, err := l.Inspect(ctx, "test_id", limit)
+	assert.Nil(t, err)
+	assert.Equal(t, res.Allowed, 1)
+	assert.Equal(t, 0, res.Remaining)
+}
+
+func TestInspectAndAllow(t *testing.T) {
+	ctx := context.Background()
+
+	l := rateLimiter()
+	limit := redis_rate.PerHour(1)
+
+	res, err := l.Inspect(ctx, "test_id", limit)
+	assert.Nil(t, err)
+	assert.Equal(t, res.Allowed, 1)
+	assert.Equal(t, 0, res.Remaining)
+
+	res, err = l.Allow(ctx, "test_id", limit)
+	assert.Nil(t, err)
+	assert.Equal(t, res.Allowed, 1) // Allowed should be still 1, since Inspect doesnt "drop on buckets"
+	assert.Equal(t, 0, res.Remaining)
+
+	res, err = l.Inspect(ctx, "test_id", limit)
+	assert.Nil(t, err)
+	assert.Equal(t, res.Allowed, 0)
+	assert.Equal(t, 0, res.Remaining)
+}
+
 func BenchmarkAllow(b *testing.B) {
 	ctx := context.Background()
 	l := rateLimiter()
@@ -145,6 +179,26 @@ func BenchmarkAllowAtMost(b *testing.B) {
 	b.RunParallel(func(pb *testing.PB) {
 		for pb.Next() {
 			res, err := l.AllowAtMost(ctx, "foo", limit, 1)
+			if err != nil {
+				b.Fatal(err)
+			}
+			if res.Allowed == 0 {
+				panic("not reached")
+			}
+		}
+	})
+}
+
+func BenchmarkInspect(b *testing.B) {
+	ctx := context.Background()
+	l := rateLimiter()
+	limit := redis_rate.PerSecond(1e6)
+
+	b.ResetTimer()
+
+	b.RunParallel(func(pb *testing.PB) {
+		for pb.Next() {
+			res, err := l.Inspect(ctx, "foo", limit)
 			if err != nil {
 				b.Fatal(err)
 			}

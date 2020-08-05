@@ -158,6 +158,36 @@ func (l Limiter) AllowAtMost(
 	return res, nil
 }
 
+// Inspect reports whether its allowed or not, without "dropping" in buckets
+func (l Limiter) Inspect(ctx context.Context, key string, limit Limit) (*Result, error) {
+	values := []interface{}{limit.Burst, limit.Rate, limit.Period.Seconds(), 1}
+	v, err := inspect.Run(ctx, l.rdb, []string{redisPrefix + key}, values...).Result()
+	if err != nil {
+		return nil, err
+	}
+
+	values = v.([]interface{})
+
+	retryAfter, err := strconv.ParseFloat(values[2].(string), 64)
+	if err != nil {
+		return nil, err
+	}
+
+	resetAfter, err := strconv.ParseFloat(values[3].(string), 64)
+	if err != nil {
+		return nil, err
+	}
+
+	res := &Result{
+		Limit:      limit,
+		Allowed:    int(values[0].(int64)),
+		Remaining:  int(values[1].(int64)),
+		RetryAfter: dur(retryAfter),
+		ResetAfter: dur(resetAfter),
+	}
+	return res, nil
+}
+
 func dur(f float64) time.Duration {
 	if f == -1 {
 		return -1
