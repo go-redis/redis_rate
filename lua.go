@@ -43,7 +43,7 @@ local new_tat = tat + increment
 local allow_at = new_tat - burst_offset
 
 local diff = now - allow_at
-local remaining = math.floor(diff / emission_interval + 0.5)
+local remaining = diff / emission_interval
 
 if remaining < 0 then
   local reset_after = tat - now
@@ -97,9 +97,9 @@ end
 tat = math.max(tat, now)
 
 local diff = now - (tat - burst_offset)
-local remaining = math.floor(diff / emission_interval + 0.5)
+local remaining = diff / emission_interval
 
-if remaining == 0 then
+if remaining < 1 then
   local reset_after = tat - now
   local retry_after = emission_interval - diff
   return {
