@@ -1,7 +1,9 @@
 # Rate limiting for go-redis
 
 [![Build Status](https://travis-ci.org/go-redis/redis_rate.svg?branch=master)](https://travis-ci.org/go-redis/redis_rate)
-[![GoDoc](https://godoc.org/github.com/go-redis/redis_rate?status.svg)](https://pkg.go.dev/github.com/go-redis/redis_rate/v9)
+[![PkgGoDev](https://pkg.go.dev/badge/github.com/go-redis/redis/v8)](https://pkg.go.dev/github.com/go-redis/redis_rate/v9)
+
+> :heart: [**Uptrace.dev** - distributed traces, logs, and errors in one place](https://uptrace.dev)
 
 This package is based on [rwz/redis-gcra](https://github.com/rwz/redis-gcra) and implements
 [GCRA](https://en.wikipedia.org/wiki/Generic_cell_rate_algorithm) (aka leaky bucket) for rate
