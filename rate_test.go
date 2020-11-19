@@ -59,6 +59,28 @@ func TestAllow(t *testing.T) {
 	assert.InDelta(t, res.ResetAfter, 999*time.Millisecond, float64(10*time.Millisecond))
 }
 
+func TestRetryAfter(t *testing.T) {
+	limit := redis_rate.Limit{
+		Rate:   1,
+		Period: time.Millisecond,
+		Burst:  1,
+	}
+
+	ctx := context.Background()
+	l := rateLimiter()
+
+	for i := 0; i < 1000; i++ {
+		res, err := l.Allow(ctx, "test_id", limit)
+		assert.Nil(t, err)
+
+		if res.Allowed > 0 {
+			continue
+		}
+
+		assert.LessOrEqual(t, int64(res.RetryAfter), int64(time.Millisecond))
+	}
+}
+
 func TestAllowAtMost(t *testing.T) {
 	ctx := context.Background()
 
