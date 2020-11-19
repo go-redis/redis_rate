@@ -16,6 +16,7 @@ type rediser interface {
 	EvalSha(ctx context.Context, sha1 string, keys []string, args ...interface{}) *redis.Cmd
 	ScriptExists(ctx context.Context, hashes ...string) *redis.BoolSliceCmd
 	ScriptLoad(ctx context.Context, script string) *redis.StringCmd
+	Del(ctx context.Context, keys ...string) *redis.IntCmd
 }
 
 type Limit struct {
@@ -156,6 +157,11 @@ func (l Limiter) AllowAtMost(
 		ResetAfter: dur(resetAfter),
 	}
 	return res, nil
+}
+
+// Reset gets a key and reset all limitations and previous usages
+func (l *Limiter) Reset(ctx context.Context, key string) error {
+	return l.rdb.Del(ctx, redisPrefix+key).Err()
 }
 
 func dur(f float64) time.Duration {
