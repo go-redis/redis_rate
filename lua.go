@@ -123,7 +123,9 @@ local increment = emission_interval * cost
 local new_tat = tat + increment
 
 local reset_after = new_tat - now
-redis.call("SET", rate_limit_key, new_tat, "EX", math.ceil(reset_after))
+if reset_after > 0 then
+  redis.call("SET", rate_limit_key, new_tat, "EX", math.ceil(reset_after))
+end
 
 return {
   cost,
