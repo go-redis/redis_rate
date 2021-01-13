@@ -68,6 +68,19 @@ func TestAllow(t *testing.T) {
 	require.InDelta(t, res.ResetAfter, 999*time.Millisecond, float64(10*time.Millisecond))
 }
 
+func TestAllowN_IncrementZero(t *testing.T) {
+	ctx := context.Background()
+	l := rateLimiter()
+	limit := redis_rate.PerSecond(10)
+
+	res, err := l.AllowN(ctx, "test_id", limit, 0)
+	require.Nil(t, err)
+	require.Equal(t, res.Allowed, 0)
+	require.Equal(t, res.Remaining, 10)
+	require.Equal(t, res.RetryAfter, time.Duration(-1))
+	require.Equal(t, res.ResetAfter, time.Duration(0))
+}
+
 func TestRetryAfter(t *testing.T) {
 	limit := redis_rate.Limit{
 		Rate:   1,
