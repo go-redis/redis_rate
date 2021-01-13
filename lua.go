@@ -57,7 +57,9 @@ if remaining < 0 then
 end
 
 local reset_after = new_tat - now
-redis.call("SET", rate_limit_key, new_tat, "EX", math.ceil(reset_after))
+if reset_after > 0 then
+  redis.call("SET", rate_limit_key, new_tat, "EX", math.ceil(reset_after))
+end
 local retry_after = -1
 return {cost, remaining, tostring(retry_after), tostring(reset_after)}
 `)
