@@ -68,6 +68,36 @@ func TestAllow(t *testing.T) {
 	require.InDelta(t, res.ResetAfter, 999*time.Millisecond, float64(10*time.Millisecond))
 }
 
+func TestAllowN_IncrementZero(t *testing.T) {
+	ctx := context.Background()
+	l := rateLimiter()
+	limit := redis_rate.PerSecond(10)
+
+	// Check for a row that's not there
+	res, err := l.AllowN(ctx, "test_id", limit, 0)
+	require.Nil(t, err)
+	require.Equal(t, res.Allowed, 0)
+	require.Equal(t, res.Remaining, 10)
+	require.Equal(t, res.RetryAfter, time.Duration(-1))
+	require.Equal(t, res.ResetAfter, time.Duration(0))
+
+	// Now increment it
+	res, err = l.Allow(ctx, "test_id", limit)
+	require.Nil(t, err)
+	require.Equal(t, res.Allowed, 1)
+	require.Equal(t, res.Remaining, 9)
+	require.Equal(t, res.RetryAfter, time.Duration(-1))
+	require.InDelta(t, res.ResetAfter, 100*time.Millisecond, float64(10*time.Millisecond))
+
+	// Peek again
+	res, err = l.AllowN(ctx, "test_id", limit, 0)
+	require.Nil(t, err)
+	require.Equal(t, res.Allowed, 0)
+	require.Equal(t, res.Remaining, 9)
+	require.Equal(t, res.RetryAfter, time.Duration(-1))
+	require.InDelta(t, res.ResetAfter, 100*time.Millisecond, float64(10*time.Millisecond))
+}
+
 func TestRetryAfter(t *testing.T) {
 	limit := redis_rate.Limit{
 		Rate:   1,
@@ -144,6 +174,36 @@ func TestAllowAtMost(t *testing.T) {
 	require.Equal(t, res.Remaining, 0)
 	require.InDelta(t, res.RetryAfter, 99*time.Second, float64(time.Second))
 	require.InDelta(t, res.ResetAfter, 999*time.Millisecond, float64(10*time.Millisecond))
+}
+
+func TestAllowAtMost_IncrementZero(t *testing.T) {
+	ctx := context.Background()
+	l := rateLimiter()
+	limit := redis_rate.PerSecond(10)
+
+	// Check for a row that isn't there
+	res, err := l.AllowAtMost(ctx, "test_id", limit, 0)
+	require.Nil(t, err)
+	require.Equal(t, res.Allowed, 0)
+	require.Equal(t, res.Remaining, 10)
+	require.Equal(t, res.RetryAfter, time.Duration(-1))
+	require.Equal(t, res.ResetAfter, time.Duration(0))
+
+	// Now increment it
+	res, err = l.Allow(ctx, "test_id", limit)
+	require.Nil(t, err)
+	require.Equal(t, res.Allowed, 1)
+	require.Equal(t, res.Remaining, 9)
+	require.Equal(t, res.RetryAfter, time.Duration(-1))
+	require.InDelta(t, res.ResetAfter, 100*time.Millisecond, float64(10*time.Millisecond))
+
+	// Peek again
+	res, err = l.AllowAtMost(ctx, "test_id", limit, 0)
+	require.Nil(t, err)
+	require.Equal(t, res.Allowed, 0)
+	require.Equal(t, res.Remaining, 9)
+	require.Equal(t, res.RetryAfter, time.Duration(-1))
+	require.InDelta(t, res.ResetAfter, 100*time.Millisecond, float64(10*time.Millisecond))
 }
 
 func BenchmarkAllow(b *testing.B) {
