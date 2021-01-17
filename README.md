@@ -21,7 +21,7 @@ module:
 go mod init github.com/my/repo
 ```
 
-And then install redis*rate/v9 (note \_v9* in the import; omitting it is a popular mistake):
+And then install redis\_rate/v9 (note \_v9* in the import; omitting it is a popular mistake):
 
 ```shell
 go get github.com/go-redis/redis_rate/v9
