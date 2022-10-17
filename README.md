@@ -21,10 +21,10 @@ module:
 go mod init github.com/my/repo
 ```
 
-And then install redis\_rate/v9 (note **_v9_** in the import; omitting it is a popular mistake):
+And then install redis\_rate/v10 (note **_v10_** in the import; omitting it is a popular mistake):
 
 ```shell
-go get github.com/go-redis/redis_rate/v9
+go get github.com/go-redis/redis_rate/v10
 ```
 
 ## Example
@@ -36,8 +36,8 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/go-redis/redis/v8"
-	"github.com/go-redis/redis_rate/v9"
+	"github.com/go-redis/redis/v9"
+	"github.com/go-redis/redis_rate/v10"
 )
 
 func ExampleNewLimiter() {
