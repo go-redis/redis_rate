@@ -5,7 +5,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/go-redis/redis/v8"
+	"github.com/go-redis/redis/v9"
 	"github.com/stretchr/testify/require"
 
 	"github.com/go-redis/redis_rate/v9"
