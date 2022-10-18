@@ -1,6 +1,6 @@
 package redis_rate
 
-import "github.com/go-redis/redis/v8"
+import "github.com/go-redis/redis/v9"
 
 // Copyright (c) 2017 Pavel Pravosud
 // https://github.com/rwz/redis-gcra/blob/master/vendor/perform_gcra_ratelimit.lua

@@ -6,7 +6,7 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/go-redis/redis/v8"
+	"github.com/go-redis/redis/v9"
 )
 
 const redisPrefix = "rate:"
@@ -17,6 +17,9 @@ type rediser interface {
 	ScriptExists(ctx context.Context, hashes ...string) *redis.BoolSliceCmd
 	ScriptLoad(ctx context.Context, script string) *redis.StringCmd
 	Del(ctx context.Context, keys ...string) *redis.IntCmd
+
+	EvalRO(ctx context.Context, script string, keys []string, args ...interface{}) *redis.Cmd
+	EvalShaRO(ctx context.Context, sha1 string, keys []string, args ...interface{}) *redis.Cmd
 }
 
 type Limit struct {
@@ -69,7 +72,7 @@ func PerHour(rate int) Limit {
 	}
 }
 
-//------------------------------------------------------------------------------
+// ------------------------------------------------------------------------------
 
 // Limiter controls how frequently events are allowed to happen.
 type Limiter struct {
