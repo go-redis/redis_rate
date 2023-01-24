@@ -1,7 +1,7 @@
 # Rate limiting for go-redis
 
 [![Build Status](https://travis-ci.org/go-redis/redis_rate.svg?branch=master)](https://travis-ci.org/go-redis/redis_rate)
-[![PkgGoDev](https://pkg.go.dev/badge/github.com/go-redis/redis/v8)](https://pkg.go.dev/github.com/go-redis/redis_rate/v9)
+[![PkgGoDev](https://pkg.go.dev/badge/github.com/redis/go-redis/v8)](https://pkg.go.dev/github.com/go-redis/redis_rate/v9)
 
 > :heart: [**Uptrace.dev** - distributed traces, logs, and errors in one place](https://uptrace.dev)
 
@@ -21,7 +21,8 @@ module:
 go mod init github.com/my/repo
 ```
 
-And then install redis\_rate/v10 (note **_v10_** in the import; omitting it is a popular mistake):
+And then install redis*rate/v10 (note \*\*\_v10*\*\* in the import; omitting it is a popular
+mistake):
 
 ```shell
 go get github.com/go-redis/redis_rate/v10
@@ -36,7 +37,7 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/go-redis/redis/v9"
+	"github.com/redis/go-redis/v9"
 	"github.com/go-redis/redis_rate/v10"
 )
 
