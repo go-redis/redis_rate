@@ -3,7 +3,7 @@ module github.com/go-redis/redis_rate/v10
 go 1.19
 
 require (
-	github.com/redis/go-redis/v9 v9.0.0-rc.4
+	github.com/redis/go-redis/v9 v9.0.2
 	github.com/stretchr/testify v1.8.1
 )
 
