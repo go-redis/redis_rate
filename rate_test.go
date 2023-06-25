@@ -18,7 +18,11 @@ func rateLimiter() *redis_rate.Limiter {
 	if err := ring.FlushDB(context.TODO()).Err(); err != nil {
 		panic(err)
 	}
-	return redis_rate.NewLimiter(ring, "")
+	ll := redis_rate.NewLimiter(ring, "")
+	if err := ll.LoadScripts(context.Background()); err != nil {
+		panic(err)
+	}
+	return ll
 }
 
 func TestAllow(t *testing.T) {
@@ -118,6 +122,21 @@ func TestRetryAfter(t *testing.T) {
 
 		require.LessOrEqual(t, int64(res.RetryAfter), int64(time.Millisecond))
 	}
+}
+
+func TestAllowMulti(t *testing.T) {
+	ctx := context.Background()
+
+	l := rateLimiter()
+	limits := map[string]redis_rate.Limit{
+		"foo":                                  redis_rate.PerSecond(1e6),
+		"tenant:exmaple.company.tenant/second": redis_rate.PerSecond(1e6),
+		"ip:123.123.123.200/second":            redis_rate.PerSecond(1e6),
+		"ip:123.123.123.200/hour":              redis_rate.PerHour(1e6),
+	}
+
+	_, err := l.AllowMulti(ctx, limits)
+	require.Nil(t, err)
 }
 
 func TestAllowAtMost(t *testing.T) {
@@ -241,6 +260,33 @@ func BenchmarkAllowAtMost(b *testing.B) {
 			}
 			if res.Allowed == 0 {
 				panic("not reached")
+			}
+		}
+	})
+}
+
+func BenchmarkAllowMulti(b *testing.B) {
+	ctx := context.Background()
+	l := rateLimiter()
+	limits := map[string]redis_rate.Limit{
+		"foo":                                  redis_rate.PerSecond(1e6),
+		"tenant:exmaple.company.tenant/second": redis_rate.PerSecond(1e6),
+		"ip:123.123.123.200/second":            redis_rate.PerSecond(1e6),
+		"ip:123.123.123.200/hour":              redis_rate.PerHour(1e6),
+	}
+
+	b.ResetTimer()
+
+	b.RunParallel(func(pb *testing.PB) {
+		for pb.Next() {
+			res, err := l.AllowMulti(ctx, limits)
+			if err != nil {
+				b.Fatal(err)
+			}
+			for _, r := range res {
+				if r.Allowed == 0 {
+					panic("not reached")
+				}
 			}
 		}
 	})

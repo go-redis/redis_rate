@@ -1,6 +1,7 @@
 package redis_rate
 
 import (
+	"bytes"
 	"context"
 	"fmt"
 	"strconv"
@@ -12,6 +13,8 @@ import (
 const defaultRedisPrefix = "rate:"
 
 type RedisClientConn interface {
+	Pipelined(ctx context.Context, fn func(redis.Pipeliner) error) ([]redis.Cmder, error)
+
 	Eval(ctx context.Context, script string, keys []string, args ...interface{}) *redis.Cmd
 	EvalSha(ctx context.Context, sha1 string, keys []string, args ...interface{}) *redis.Cmd
 	ScriptExists(ctx context.Context, hashes ...string) *redis.BoolSliceCmd
@@ -20,6 +23,8 @@ type RedisClientConn interface {
 
 	EvalRO(ctx context.Context, script string, keys []string, args ...interface{}) *redis.Cmd
 	EvalShaRO(ctx context.Context, sha1 string, keys []string, args ...interface{}) *redis.Cmd
+
+	// redis.Cmdable // can uncomment when testing using new interface methods
 }
 
 type Limit struct {
@@ -91,9 +96,96 @@ func NewLimiter(rdb RedisClientConn, prefix string) *Limiter {
 	}
 }
 
+func (l *Limiter) LoadScripts(ctx context.Context) error {
+	_, err := allowN.Load(ctx, l.rdb).Result()
+	if err != nil {
+		return err
+	}
+
+	_, err = allowAtMost.Load(ctx, l.rdb).Result()
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
 // Allow is a shortcut for AllowN(ctx, key, limit, 1).
 func (l *Limiter) Allow(ctx context.Context, key string, limit Limit) (*Result, error) {
 	return l.AllowN(ctx, key, limit, 1)
+}
+
+type pipelineResult struct {
+	key   string
+	limit Limit
+	cmd   *redis.Cmd
+}
+
+func (l *Limiter) AllowMulti(ctx context.Context, limits map[string]Limit) ([]*Result, error) {
+	results := make([]*pipelineResult, 0, len(limits))
+	buf := bytes.Buffer{}
+	_, err := l.rdb.Pipelined(ctx, func(pipe redis.Pipeliner) error {
+		for key, limit := range limits {
+			values := []interface{}{limit.Burst, limit.Rate, limit.Period.Seconds(), int(1)}
+
+			buf.Reset()
+			_, _ = buf.WriteString(l.prefix)
+			_, _ = buf.WriteString(key)
+
+			results = append(results, &pipelineResult{
+				key:   key,
+				limit: limit,
+				cmd: allowN.EvalSha(
+					ctx,
+					pipe,
+					[]string{buf.String()},
+					values...,
+				),
+			})
+		}
+		return nil
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	rv := make([]*Result, 0, len(results))
+	for _, result := range results {
+		v, err := result.cmd.Result()
+		if err != nil {
+			return nil, err
+		}
+		values := v.([]interface{})
+		rr, err := parseScriptResult(result.key, result.limit, values)
+		if err != nil {
+			return nil, err
+		}
+		rv = append(rv, rr)
+	}
+
+	return rv, nil
+}
+
+func parseScriptResult(key string, limit Limit, values []interface{}) (*Result, error) {
+	retryAfter, err := strconv.ParseFloat(values[2].(string), 64)
+	if err != nil {
+		return nil, err
+	}
+
+	resetAfter, err := strconv.ParseFloat(values[3].(string), 64)
+	if err != nil {
+		return nil, err
+	}
+
+	res := &Result{
+		Key:        key,
+		Limit:      limit,
+		Allowed:    int(values[0].(int64)),
+		Remaining:  int(values[1].(int64)),
+		RetryAfter: dur(retryAfter),
+		ResetAfter: dur(resetAfter),
+	}
+	return res, nil
 }
 
 // AllowN reports whether n events may happen at time now.
@@ -111,24 +203,7 @@ func (l *Limiter) AllowN(
 
 	values = v.([]interface{})
 
-	retryAfter, err := strconv.ParseFloat(values[2].(string), 64)
-	if err != nil {
-		return nil, err
-	}
-
-	resetAfter, err := strconv.ParseFloat(values[3].(string), 64)
-	if err != nil {
-		return nil, err
-	}
-
-	res := &Result{
-		Limit:      limit,
-		Allowed:    int(values[0].(int64)),
-		Remaining:  int(values[1].(int64)),
-		RetryAfter: dur(retryAfter),
-		ResetAfter: dur(resetAfter),
-	}
-	return res, nil
+	return parseScriptResult(key, limit, values)
 }
 
 // AllowAtMost reports whether at most n events may happen at time now.
@@ -147,24 +222,7 @@ func (l *Limiter) AllowAtMost(
 
 	values = v.([]interface{})
 
-	retryAfter, err := strconv.ParseFloat(values[2].(string), 64)
-	if err != nil {
-		return nil, err
-	}
-
-	resetAfter, err := strconv.ParseFloat(values[3].(string), 64)
-	if err != nil {
-		return nil, err
-	}
-
-	res := &Result{
-		Limit:      limit,
-		Allowed:    int(values[0].(int64)),
-		Remaining:  int(values[1].(int64)),
-		RetryAfter: dur(retryAfter),
-		ResetAfter: dur(resetAfter),
-	}
-	return res, nil
+	return parseScriptResult(key, limit, values)
 }
 
 // Reset gets a key and reset all limitations and previous usages
@@ -180,6 +238,9 @@ func dur(f float64) time.Duration {
 }
 
 type Result struct {
+	// Name of the key used for this result.
+	Key string
+
 	// Limit is the limit that was used to obtain this result.
 	Limit Limit
 
