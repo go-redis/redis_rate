@@ -6,7 +6,7 @@ import (
 
 	"github.com/redis/go-redis/v9"
 
-	"github.com/go-redis/redis_rate/v10"
+	"github.com/ductone/redis_rate/v11"
 )
 
 func ExampleNewLimiter() {
@@ -16,7 +16,7 @@ func ExampleNewLimiter() {
 	})
 	_ = rdb.FlushDB(ctx).Err()
 
-	limiter := redis_rate.NewLimiter(rdb)
+	limiter := redis_rate.NewLimiter(rdb, "")
 	res, err := limiter.Allow(ctx, "project:123", redis_rate.PerSecond(10))
 	if err != nil {
 		panic(err)

@@ -8,7 +8,7 @@ import (
 	"github.com/redis/go-redis/v9"
 	"github.com/stretchr/testify/require"
 
-	"github.com/go-redis/redis_rate/v10"
+	"github.com/ductone/redis_rate/v11"
 )
 
 func rateLimiter() *redis_rate.Limiter {
@@ -18,7 +18,7 @@ func rateLimiter() *redis_rate.Limiter {
 	if err := ring.FlushDB(context.TODO()).Err(); err != nil {
 		panic(err)
 	}
-	return redis_rate.NewLimiter(ring)
+	return redis_rate.NewLimiter(ring, "")
 }
 
 func TestAllow(t *testing.T) {
