@@ -1,4 +1,4 @@
-package redis_rate
+package redis_rate //nolint:revive // upstream used this name
 
 import (
 	"bytes"
@@ -50,8 +50,9 @@ func fmtDur(d time.Duration) string {
 		return "m"
 	case time.Hour:
 		return "h"
+	default:
+		return d.String()
 	}
-	return d.String()
 }
 
 func PerSecond(rate int) Limit {
@@ -256,7 +257,7 @@ func (l *Limiter) AllowAtMost(
 	return parseScriptResult(key, limit, values)
 }
 
-// Reset gets a key and reset all limitations and previous usages
+// Reset gets a key and reset all limitations and previous usages.
 func (l *Limiter) Reset(ctx context.Context, key string) error {
 	return l.rdb.Del(ctx, l.prefix+key).Err()
 }

@@ -1,0 +1,104 @@
+linters-settings:
+  exhaustive:
+    default-signifies-exhaustive: true
+
+  gocritic:
+    # The list of supported checkers can be find in https://go-critic.github.io/overview.
+    settings:
+      underef:
+        # Whether to skip (*x).method() calls where x is a pointer receiver.
+        skipRecvDeref: false
+
+  govet:
+    enable-all: true
+    disable:
+      - fieldalignment # too strict
+      - shadow # complains too much about shadowing errors. All research points to this being fine.
+
+  nakedret:
+    max-func-lines: 0
+
+  nolintlint:
+    allow-no-explanation: [forbidigo, tracecheck, gomnd, gochecknoinits, makezero]
+    require-explanation: true
+    require-specific: true
+
+  revive:
+    ignore-generated-header: true
+    severity: error
+    rules:
+      - name: atomic
+      - name: line-length-limit
+        arguments: [200]
+      # These are functions that we use without checking the errors often. Most of these can't return an error even
+      # though they implement an interface that can.
+      - name: unhandled-error
+        arguments:
+          - fmt.Printf
+          - fmt.Println
+          - fmt.Fprintf
+          - fmt.Fprintln
+          - os.Stderr.Sync
+          - sb.WriteString
+          - buf.WriteString
+          - hasher.Write
+          - os.Setenv
+          - os.RemoveAll
+      - name: var-naming
+        arguments: [['ID', 'URL', 'HTTP', 'API'], []]
+
+  tenv:
+    all: true
+
+  varcheck:
+    exported-fields: false # this appears to improperly detect exported variables as unused when they are used from a package with the same name
+
+linters:
+  disable-all: true
+  enable:
+    - errcheck # Errcheck is a program for checking for unchecked errors in go programs. These unchecked errors can be critical bugs in some cases
+    - gosimple # Linter for Go source code that specializes in simplifying a code
+    - govet # Vet examines Go source code and reports suspicious constructs, such as Printf calls whose arguments do not align with the format string
+    - ineffassign # Detects when assignments to existing variables are not used
+    - staticcheck # Staticcheck is a go vet on steroids, applying a ton of static analysis checks
+    - typecheck # Like the front-end of a Go compiler, parses and type-checks Go code
+    - unused # Checks Go code for unused constants, variables, functions and types
+    - asasalint # Check for pass []any as any in variadic func(...any)
+    - asciicheck # Simple linter to check that your code does not contain non-ASCII identifiers
+    - bidichk # Checks for dangerous unicode character sequences
+    - bodyclose # checks whether HTTP response body is closed successfully
+    - durationcheck # check for two durations multiplied together
+    - errorlint # errorlint is a linter for that can be used to find code that will cause problems with the error wrapping scheme introduced in Go 1.13.
+    - execinquery # execinquery is a linter about query string checker in Query function which reads your Go src files and warning it finds
+    - exhaustive # check exhaustiveness of enum switch statements
+    - exportloopref # checks for pointers to enclosing loop variables
+    - forbidigo # Forbids identifiers
+    - gochecknoinits # Checks that no init functions are present in Go code
+    - goconst # Finds repeated strings that could be replaced by a constant
+    - gocritic # Provides diagnostics that check for bugs, performance and style issues.
+    - godot # Check if comments end in a period
+    - goimports # In addition to fixing imports, goimports also formats your code in the same style as gofmt.
+    - gomoddirectives # Manage the use of 'replace', 'retract', and 'excludes' directives in go.mod.
+    - goprintffuncname # Checks that printf-like functions are named with f at the end
+    - gosec # Inspects source code for security problems
+    - nakedret # Finds naked returns in functions greater than a specified function length
+    - nilerr # Finds the code that returns nil even if it checks that the error is not nil.
+    - noctx # noctx finds sending http request without context.Context
+    - nolintlint # Reports ill-formed or insufficient nolint directives
+    - nonamedreturns # Reports all named returns
+    - nosprintfhostport # Checks for misuse of Sprintf to construct a host with port in a URL.
+    - predeclared # find code that shadows one of Go's predeclared identifiers
+    - revive # Fast, configurable, extensible, flexible, and beautiful linter for Go. Drop-in replacement of golint.
+    - tenv # tenv is analyzer that detects using os.Setenv instead of t.Setenv since Go1.17
+    - tparallel # tparallel detects inappropriate usage of t.Parallel() method in your Go test codes
+    - unconvert # Remove unnecessary type conversions
+    - usestdlibvars # detect the possibility to use variables/constants from the Go standard library
+    - whitespace # Tool for detection of leading and trailing whitespace
+
+issues:
+  max-same-issues: 50
+
+  exclude-rules:
+    # Don't require TODO comments to end in a period
+    - source: '(TODO)'
+      linters: [godot]

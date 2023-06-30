@@ -2,6 +2,8 @@ package redis_rate_test
 
 import (
 	"context"
+	"net"
+	"os"
 	"testing"
 	"time"
 
@@ -12,8 +14,16 @@ import (
 )
 
 func rateLimiter() *redis_rate.Limiter {
+	redisHost := os.Getenv("TEST_REDIS_HOST")
+	redisPort := os.Getenv("TEST_REDIS_PORT")
+	if redisHost == "" {
+		redisHost = "127.0.0.1"
+	}
+	if redisPort == "" {
+		redisPort = "6379"
+	}
 	ring := redis.NewRing(&redis.RingOptions{
-		Addrs: map[string]string{"server0": ":6379"},
+		Addrs: map[string]string{"server0": net.JoinHostPort(redisHost, redisPort)},
 	})
 	if err := ring.FlushDB(context.TODO()).Err(); err != nil {
 		panic(err)

@@ -1,4 +1,4 @@
-package redis_rate
+package redis_rate //nolint:revive // upstream used this name
 
 import (
 	_ "embed"
