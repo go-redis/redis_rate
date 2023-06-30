@@ -210,8 +210,9 @@ func parseScriptResult(key string, limit Limit, values []interface{}) (*Result, 
 	res := &Result{
 		Key:        key,
 		Limit:      limit,
-		Allowed:    int(values[0].(int64)),
-		Remaining:  int(values[1].(int64)),
+		Allowed:    values[0].(int64),
+		Remaining:  values[1].(int64),
+		Used:       0,
 		RetryAfter: dur(retryAfter),
 		ResetAfter: dur(resetAfter),
 	}
@@ -275,14 +276,17 @@ type Result struct {
 	Limit Limit
 
 	// Allowed is the number of events that may happen at time now.
-	Allowed int
+	Allowed int64
+
+	// Used is the number of events that have already happened at time now.
+	Used int64
 
 	// Remaining is the maximum number of requests that could be
 	// permitted instantaneously for this key given the current
 	// state. For example, if a rate limiter allows 10 requests per
 	// second and has already received 6 requests for this key this
 	// second, Remaining would be 4.
-	Remaining int
+	Remaining int64
 
 	// RetryAfter is the time until the next request will be permitted.
 	// It should be -1 unless the rate limit has been exceeded.
