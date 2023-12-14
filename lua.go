@@ -8,7 +8,6 @@ var allowN = redis.NewScript(`
 -- this script has side-effects, so it requires replicate commands mode
 redis.replicate_commands()
 
-local rate_limit_key = KEYS[1]
 local burst = ARGV[1]
 local rate = ARGV[2]
 local period = ARGV[3]
@@ -29,7 +28,7 @@ local jan_1_2017 = 1483228800
 local now = redis.call("TIME")
 now = (now[1] - jan_1_2017) + (now[2] / 1000000)
 
-local tat = redis.call("GET", rate_limit_key)
+local tat = redis.call("GET", KEYS[1])
 
 if not tat then
   tat = now
@@ -58,7 +57,7 @@ end
 
 local reset_after = new_tat - now
 if reset_after > 0 then
-  redis.call("SET", rate_limit_key, new_tat, "EX", math.ceil(reset_after))
+  redis.call("SET", KEYS[1], new_tat, "EX", math.ceil(reset_after))
 end
 local retry_after = -1
 return {cost, remaining, tostring(retry_after), tostring(reset_after)}
@@ -68,7 +67,6 @@ var allowAtMost = redis.NewScript(`
 -- this script has side-effects, so it requires replicate commands mode
 redis.replicate_commands()
 
-local rate_limit_key = KEYS[1]
 local burst = ARGV[1]
 local rate = ARGV[2]
 local period = ARGV[3]
@@ -88,7 +86,7 @@ local jan_1_2017 = 1483228800
 local now = redis.call("TIME")
 now = (now[1] - jan_1_2017) + (now[2] / 1000000)
 
-local tat = redis.call("GET", rate_limit_key)
+local tat = redis.call("GET", KEYS[1])
 
 if not tat then
   tat = now
@@ -124,7 +122,7 @@ local new_tat = tat + increment
 
 local reset_after = new_tat - now
 if reset_after > 0 then
-  redis.call("SET", rate_limit_key, new_tat, "EX", math.ceil(reset_after))
+  redis.call("SET", KEYS[1], new_tat, "EX", math.ceil(reset_after))
 end
 
 return {
