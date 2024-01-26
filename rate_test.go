@@ -21,10 +21,22 @@ func rateLimiter() *redis_rate.Limiter {
 	return redis_rate.NewLimiter(ring)
 }
 
-func TestAllow(t *testing.T) {
-	ctx := context.Background()
+func TestAllow_WithKeyPrefix(t *testing.T) {
+	ring := redis.NewRing(&redis.RingOptions{
+		Addrs: map[string]string{"server0": ":6379"},
+	})
+	if err := ring.FlushDB(context.TODO()).Err(); err != nil {
+		panic(err)
+	}
+	testAllow(t, redis_rate.NewLimiter(ring, redis_rate.WithKeyPrefix("redis_rate:")))
+}
 
-	l := rateLimiter()
+func TestAllow(t *testing.T) {
+	testAllow(t, rateLimiter())
+}
+
+func testAllow(t *testing.T, l *redis_rate.Limiter) {
+	ctx := context.Background()
 
 	limit := redis_rate.PerSecond(10)
 	require.Equal(t, limit.String(), "10 req/s (burst 10)")
