@@ -46,7 +46,6 @@ func ExampleNewLimiter() {
 	rdb := redis.NewClient(&redis.Options{
 		Addr: "localhost:6379",
 	})
-	_ = rdb.FlushDB(ctx).Err()
 
 	limiter := redis_rate.NewLimiter(rdb)
 	res, err := limiter.Allow(ctx, "project:123", redis_rate.PerSecond(10))
