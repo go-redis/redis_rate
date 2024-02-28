@@ -8,8 +8,10 @@ import (
 
 	"github.com/redis/go-redis/v9"
 )
-
-const redisPrefix = "rate:"
+// Using curly braces around the key prefix name makes it a redis-tag.
+// redis-tag ensures that all the keys starting with this prefix are mapped to the same keyslot when redis which will fix 
+// CROSSSLOT error in redis cluster.In single instance mode all keyslots are present in same shard hence CROSSSLOT error will not happen.
+const redisPrefix = "{redis_rate}:"
 
 type rediser interface {
 	Eval(ctx context.Context, script string, keys []string, args ...interface{}) *redis.Cmd
