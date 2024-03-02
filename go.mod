@@ -4,7 +4,7 @@ go 1.19
 
 require (
 	github.com/redis/go-redis/v9 v9.0.2
-	github.com/stretchr/testify v1.8.1
+	github.com/stretchr/testify v1.9.0
 )
 
 require (
