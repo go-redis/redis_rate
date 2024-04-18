@@ -118,8 +118,8 @@ func (l Limiter) AllowN(
 
 	res := &Result{
 		Limit:      limit,
-		Allowed:    int(values[0].(int64)),
-		Remaining:  int(values[1].(int64)),
+		Allowed:    convertToInt(values[0]),
+		Remaining:  convertToInt(values[1]),
 		RetryAfter: dur(retryAfter),
 		ResetAfter: dur(resetAfter),
 	}
@@ -154,8 +154,8 @@ func (l Limiter) AllowAtMost(
 
 	res := &Result{
 		Limit:      limit,
-		Allowed:    int(values[0].(int64)),
-		Remaining:  int(values[1].(int64)),
+		Allowed:    convertToInt(values[0]),
+		Remaining:  convertToInt(values[1]),
 		RetryAfter: dur(retryAfter),
 		ResetAfter: dur(resetAfter),
 	}
@@ -172,6 +172,18 @@ func dur(f float64) time.Duration {
 		return -1
 	}
 	return time.Duration(f * float64(time.Second))
+}
+
+func convertToInt(value interface{}) int {
+	var remaining int = -1
+
+	switch v := value.(type) {
+	case int64:
+		remaining = int(v)
+	case float64:
+		remaining = int(v)
+	}
+	return remaining
 }
 
 type Result struct {
