@@ -80,6 +80,14 @@ func PerDay(rate int) Limit {
 	}
 }
 
+func Per(rate int, period time.Duration) Limit {
+	return Limit{
+		Rate:   rate,
+		Period: period,
+		Burst:  rate,
+	}
+}
+
 // ------------------------------------------------------------------------------
 
 // Limiter controls how frequently events are allowed to happen.
