@@ -9,7 +9,10 @@ import (
 	"github.com/redis/go-redis/v9"
 )
 
-const redisPrefix = "rate:"
+const (
+	redisPrefix = "rate:"
+	timeDay     = 24 * time.Hour
+)
 
 type rediser interface {
 	Eval(ctx context.Context, script string, keys []string, args ...interface{}) *redis.Cmd
@@ -44,6 +47,8 @@ func fmtDur(d time.Duration) string {
 		return "m"
 	case time.Hour:
 		return "h"
+	case timeDay:
+		return "d"
 	}
 	return d.String()
 }
@@ -68,6 +73,14 @@ func PerHour(rate int) Limit {
 	return Limit{
 		Rate:   rate,
 		Period: time.Hour,
+		Burst:  rate,
+	}
+}
+
+func PerDay(rate int) Limit {
+	return Limit{
+		Rate:   rate,
+		Period: timeDay,
 		Burst:  rate,
 	}
 }

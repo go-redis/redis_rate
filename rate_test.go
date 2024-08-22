@@ -226,6 +226,26 @@ func BenchmarkAllow(b *testing.B) {
 	})
 }
 
+func BenchmarkAllowTimeDay(b *testing.B) {
+	ctx := context.Background()
+	l := rateLimiter()
+	limit := redis_rate.PerDay(10)
+
+	b.ResetTimer()
+
+	b.RunParallel(func(pb *testing.PB) {
+		for pb.Next() {
+			res, err := l.Allow(ctx, "foo", limit)
+			if err != nil {
+				b.Fatal(err)
+			}
+			if res.Allowed == 0 {
+				panic("not reached")
+			}
+		}
+	})
+}
+
 func BenchmarkAllowAtMost(b *testing.B) {
 	ctx := context.Background()
 	l := rateLimiter()
