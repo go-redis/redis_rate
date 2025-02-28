@@ -11,61 +11,75 @@ import (
 	"github.com/go-redis/redis_rate/v10"
 )
 
-func rateLimiter() *redis_rate.Limiter {
+func rateLimiterWithKeyPrefix(keyPrefix string) *redis_rate.Limiter {
 	ring := redis.NewRing(&redis.RingOptions{
 		Addrs: map[string]string{"server0": ":6379"},
 	})
 	if err := ring.FlushDB(context.TODO()).Err(); err != nil {
 		panic(err)
 	}
-	return redis_rate.NewLimiter(ring)
+	return redis_rate.NewLimiter(ring, redis_rate.WithKeyPrefix(keyPrefix))
+}
+
+func rateLimiter() *redis_rate.Limiter {
+	return rateLimiterWithKeyPrefix(redis_rate.DefaultRedisPrefix)
 }
 
 func TestAllow(t *testing.T) {
 	ctx := context.Background()
 
-	l := rateLimiter()
+	tcs := []struct {
+		keyPrefix string
+	}{
+		{keyPrefix: ""},
+		{keyPrefix: redis_rate.DefaultRedisPrefix},
+		{keyPrefix: "test:"},
+	}
+	for _, tc := range tcs {
+		t.Run(tc.keyPrefix, func(t *testing.T) {
+			l := rateLimiterWithKeyPrefix(tc.keyPrefix)
+			limit := redis_rate.PerSecond(10)
+			require.Equal(t, limit.String(), "10 req/s (burst 10)")
+			require.False(t, limit.IsZero())
 
-	limit := redis_rate.PerSecond(10)
-	require.Equal(t, limit.String(), "10 req/s (burst 10)")
-	require.False(t, limit.IsZero())
+			res, err := l.Allow(ctx, "test_id", limit)
+			require.Nil(t, err)
+			require.Equal(t, res.Allowed, 1)
+			require.Equal(t, res.Remaining, 9)
+			require.Equal(t, res.RetryAfter, time.Duration(-1))
+			require.InDelta(t, res.ResetAfter, 100*time.Millisecond, float64(10*time.Millisecond))
 
-	res, err := l.Allow(ctx, "test_id", limit)
-	require.Nil(t, err)
-	require.Equal(t, res.Allowed, 1)
-	require.Equal(t, res.Remaining, 9)
-	require.Equal(t, res.RetryAfter, time.Duration(-1))
-	require.InDelta(t, res.ResetAfter, 100*time.Millisecond, float64(10*time.Millisecond))
+			err = l.Reset(ctx, "test_id")
+			require.Nil(t, err)
+			res, err = l.Allow(ctx, "test_id", limit)
+			require.Nil(t, err)
+			require.Equal(t, res.Allowed, 1)
+			require.Equal(t, res.Remaining, 9)
+			require.Equal(t, res.RetryAfter, time.Duration(-1))
+			require.InDelta(t, res.ResetAfter, 100*time.Millisecond, float64(10*time.Millisecond))
 
-	err = l.Reset(ctx, "test_id")
-	require.Nil(t, err)
-	res, err = l.Allow(ctx, "test_id", limit)
-	require.Nil(t, err)
-	require.Equal(t, res.Allowed, 1)
-	require.Equal(t, res.Remaining, 9)
-	require.Equal(t, res.RetryAfter, time.Duration(-1))
-	require.InDelta(t, res.ResetAfter, 100*time.Millisecond, float64(10*time.Millisecond))
+			res, err = l.AllowN(ctx, "test_id", limit, 2)
+			require.Nil(t, err)
+			require.Equal(t, res.Allowed, 2)
+			require.Equal(t, res.Remaining, 7)
+			require.Equal(t, res.RetryAfter, time.Duration(-1))
+			require.InDelta(t, res.ResetAfter, 300*time.Millisecond, float64(10*time.Millisecond))
 
-	res, err = l.AllowN(ctx, "test_id", limit, 2)
-	require.Nil(t, err)
-	require.Equal(t, res.Allowed, 2)
-	require.Equal(t, res.Remaining, 7)
-	require.Equal(t, res.RetryAfter, time.Duration(-1))
-	require.InDelta(t, res.ResetAfter, 300*time.Millisecond, float64(10*time.Millisecond))
+			res, err = l.AllowN(ctx, "test_id", limit, 7)
+			require.Nil(t, err)
+			require.Equal(t, res.Allowed, 7)
+			require.Equal(t, res.Remaining, 0)
+			require.Equal(t, res.RetryAfter, time.Duration(-1))
+			require.InDelta(t, res.ResetAfter, 999*time.Millisecond, float64(10*time.Millisecond))
 
-	res, err = l.AllowN(ctx, "test_id", limit, 7)
-	require.Nil(t, err)
-	require.Equal(t, res.Allowed, 7)
-	require.Equal(t, res.Remaining, 0)
-	require.Equal(t, res.RetryAfter, time.Duration(-1))
-	require.InDelta(t, res.ResetAfter, 999*time.Millisecond, float64(10*time.Millisecond))
-
-	res, err = l.AllowN(ctx, "test_id", limit, 1000)
-	require.Nil(t, err)
-	require.Equal(t, res.Allowed, 0)
-	require.Equal(t, res.Remaining, 0)
-	require.InDelta(t, res.RetryAfter, 99*time.Second, float64(time.Second))
-	require.InDelta(t, res.ResetAfter, 999*time.Millisecond, float64(10*time.Millisecond))
+			res, err = l.AllowN(ctx, "test_id", limit, 1000)
+			require.Nil(t, err)
+			require.Equal(t, res.Allowed, 0)
+			require.Equal(t, res.Remaining, 0)
+			require.InDelta(t, res.RetryAfter, 99*time.Second, float64(time.Second))
+			require.InDelta(t, res.ResetAfter, 999*time.Millisecond, float64(10*time.Millisecond))
+		})
+	}
 }
 
 func TestAllowN_IncrementZero(t *testing.T) {
