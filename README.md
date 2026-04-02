@@ -13,7 +13,7 @@ feature.
 
 ## Installation
 
-redis_rate supports 2 last Go versions and requires a Go version with
+`redis_rate` supports 2 last Go versions and requires a Go version with
 [modules](https://github.com/golang/go/wiki/Modules) support. So make sure to initialize a Go
 module:
 
@@ -21,7 +21,7 @@ module:
 go mod init github.com/my/repo
 ```
 
-And then install redis*rate/v10 (note \*\*\_v10*\*\* in the import; omitting it is a popular
+And then install `redis_rate/v10` (note **/v10** in the import; omitting it is a popular
 mistake):
 
 ```shell
