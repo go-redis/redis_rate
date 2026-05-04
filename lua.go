@@ -1,10 +1,38 @@
 package redis_rate
 
-import "github.com/redis/go-redis/v9"
+import (
+	"os"
+	"strings"
+
+	"github.com/redis/go-redis/v9"
+)
+
+// isFIPSMode reports whether FIPS mode is active via any of the supported
+// Go runtime mechanisms: GOFIPS140 env var or GODEBUG=fips140=on/only.
+func isFIPSMode() bool {
+	if v := os.Getenv("GOFIPS140"); v != "" && v != "off" {
+		return true
+	}
+	for _, kv := range strings.Split(os.Getenv("GODEBUG"), ",") {
+		if kv == "fips140=on" || kv == "fips140=only" {
+			return true
+		}
+	}
+	return false
+}
+
+// newScript returns a FIPS-safe Script when FIPS mode is active at runtime,
+// falling back to the standard client-side SHA-1 Script otherwise.
+func newScript(src string) *redis.Script {
+	if isFIPSMode() {
+		return redis.NewScriptServerSHA(src)
+	}
+	return redis.NewScript(src)
+}
 
 // Copyright (c) 2017 Pavel Pravosud
 // https://github.com/rwz/redis-gcra/blob/master/vendor/perform_gcra_ratelimit.lua
-var allowN = redis.NewScript(`
+var allowN = newScript(`
 -- this script has side-effects, so it requires replicate commands mode
 redis.replicate_commands()
 
@@ -64,7 +92,7 @@ local retry_after = -1
 return {cost, remaining, tostring(retry_after), tostring(reset_after)}
 `)
 
-var allowAtMost = redis.NewScript(`
+var allowAtMost = newScript(`
 -- this script has side-effects, so it requires replicate commands mode
 redis.replicate_commands()
 
